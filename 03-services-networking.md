@@ -70,13 +70,15 @@ Un Service `type: NodePort` cumule **3 niveaux** :
 |---|---|---|---|
 | `userspace` | ancien | ❌ | Deprecated |
 | `iptables` | 1.2 | 👍 | Défaut historique ; règles linéaires O(n) |
-| `ipvs` | 1.11 (GA 1.11) | 🚀 | Meilleur perf gros clusters ; requiert modules kernel `ip_vs*` |
-| `nftables` | 1.29 alpha, 1.31 stable | 🚀 | Successeur d'iptables |
+| `ipvs` | 1.11 (GA 1.11) | 🚀 | Meilleur perf gros clusters ; requiert modules kernel `ip_vs*`. **Déprécié en 1.35** (migrer vers `nftables`) |
+| `nftables` | 1.29 alpha, 1.31 beta, **1.33 GA** | 🚀 | Successeur d'iptables (iptables reste le **défaut** sur Linux) |
 
 > 💡 **ClusterIP & `ping` selon le mode** :
 > - **iptables/nftables** : la ClusterIP est une **pure règle DNAT**, bindée à aucune interface → `ping <ClusterIP>` **échoue** (pas d'hôte). `curl <ClusterIP>:<port>` marche.
 > - **ipvs** : kube-proxy binde **toutes** les ClusterIP sur une interface dummy `kube-ipvs0` (IPVS exige une destination locale) → `ping` **peut** répondre, mais c'est le **host local** qui répond, **pas un Pod**. Un ping OK ne prouve **rien** sur la santé du Service.
 > - Debug backends : `sudo ipvsadm -Ln` (ipvs) vs `sudo iptables-save | grep <clusterip>` (iptables).
+
+> 💡 **`spec.trafficDistribution`** (Service, topology-aware routing, GA 1.33) : route le trafic vers l'endpoint le plus proche. Valeur `PreferClose` **renommée `PreferSameZone`** en 1.34 (+ ajout `PreferSameNode`) ; `PreferClose` déprécié mais conservé comme alias. Sert à réduire la latence / les coûts inter-zones (utile côté EKS multi-AZ).
 
 ### DNS — CoreDNS
 

@@ -39,6 +39,12 @@ graph LR
 
 > 💡 Depuis 1.28, les drivers **in-tree** (AWS EBS, GCE PD, Azure Disk, vSphere, OpenStack) sont **migrés vers CSI** (CSIMigration GA).
 
+> 💡 `hostPath.type` : `DirectoryOrCreate`/`FileOrCreate` **créent** le chemin si absent ; `Directory`/`File` **exigent** qu'il préexiste → sinon Pod bloqué en `ContainerCreating`. Défaut `""` = aucune vérif. (Rare en tâche, utile en troubleshooting.)
+
+> 💡 **`local` vs `hostPath`** : `local` = disque node-local **persistant**, le PV a une `nodeAffinity` **obligatoire** → le scheduler place le Pod sur le bon node. `hostPath` n'est **pas** scheduler-aware (le Pod peut atterrir sur un node où le chemin n'existe pas) → debug only.
+
+> 💡 **`volumeMode`** : `Filesystem` (défaut, monté sur un `mountPath`) ou `Block` (device brut exposé au container via `volumeDevices`, sans FS) — raw block depuis 1.13 (EBS, Azure Disk, FC).
+
 ### PVC — champs minimaux
 
 Un `PersistentVolumeClaim` spécifie **au minimum 2 champs obligatoires** :
@@ -63,6 +69,29 @@ Un `PersistentVolumeClaim` spécifie **au minimum 2 champs obligatoires** :
 | `ReadWriteOncePod` | RWOP (1.29 GA) | 1 seul **Pod** en RW (plus strict que RWO) |
 
 > ⚠️ Le mode d'accès **dépend du backend**. Un EBS ne fait que RWO. Demander RWX à un provisioner qui ne l'implémente pas = PVC `Pending`.
+
+> ⚠️ **RWO = 1 seul _node_, PAS 1 seul Pod** (piège classique) : 2 Pods **sur le même node** peuvent partager un RWO en RW ; un Pod sur un **autre node** → `FailedAttachVolume`/`Multi-Attach error`. Pour verrouiller à **un seul Pod**, c'est `RWOP`.
+> 💡 Matching PV↔PVC : Kubernetes groupe les PV par access mode, trie par **taille**, et prend le **premier PV assez grand** (≥ demande) → tu peux obtenir un PV **plus grand** que demandé.
+
+**Exemples concrets (valide / invalide)** :
+
+| Mode | ✅ Valide | ❌ Invalide |
+|---|---|---|
+| RWO | 2 Pods sur le **même node** écrivent | Pod sur un **autre node** → `FailedAttachVolume` |
+| ROX | N Pods multi-nodes montent en **read-only** | un Pod tente le **RW** → refusé |
+| RWX | Pods multi-nodes lisent **et** écrivent | backend ne supporte pas RWX (ex. disque cloud) → scheduling échoue |
+| RWOP | **1 Pod** exclusif | 2ᵉ Pod (même node ou autre) → mount **rejeté** |
+
+**Compatibilité mode ↔ backend (les courants)** :
+
+| Backend | RWO | ROX | RWX |
+|---|:---:|:---:|:---:|
+| AWS EBS / Azure Disk / Cinder | ✅ | — | — |
+| GCE PD / iSCSI / Ceph RBD | ✅ | ✅ | — |
+| NFS / CephFS / AWS EFS / AzureFile / Portworx | ✅ | ✅ | ✅ |
+| `hostPath` | ✅ | — | — |
+
+> 🔑 Règle mnémo : **block storage** (EBS, Azure Disk, RBD) = attaché à **1 node** → RWO(/ROX). **File/NAS** (NFS, EFS, CephFS) = partagé réseau → **RWX**. Demander RWX à un block device = PVC `Pending`.
 
 > ⚠️ **Piège LFS258** : les `accessModes` d'un PV **ne sont PAS appliqués** par Kubernetes — ils servent uniquement de **labels de matching** PV↔PVC (rien n'empêche techniquement 2 Pods d'écrire sur un RWO si le backend le permet). De même, un `hostPath`/chemin **inexistant** ne lève **aucune erreur à la création** du PV : seul le **Pod** qui tente de le monter échouera.
 
@@ -255,6 +284,8 @@ spec:
 - **Modifier `storageClassName` d'un PVC = interdit** (champ immutable). Recréer.
 - **`storageClassName: ""`** ≠ absence : `""` force un binding statique (pas de dynamic).
 - **`volumeMounts.subPath`** utile pour monter **un fichier** de ConfigMap/Secret sans écraser le dossier, mais casse la mise à jour dynamique du ConfigMap.
+- **ConfigMap/Secret — mise à jour à chaud** : injecté en **volume** = propagé automatiquement au Pod (délai ~kubelet sync, sauf `subPath`). Injecté en **env var** (`secretKeyRef`/`envFrom`) = **figé** à la création → nécessite `kubectl rollout restart` (ou recréer le Pod) pour prendre la nouvelle valeur.
+- **Secret/ConfigMap en volume — mécanique & customisation** : chaque **clé → un fichier** (`mountPath/<clé>`, contenu = valeur décodée). `items:` = ne monter que **certaines clés** (+ renommer via `path`). `defaultMode`/`mode` (octal, ex `0400`) = **permissions** des fichiers. `readOnly: true` recommandé.
 - **Node avec `volumeAttachments` en attente** : `k get volumeattachment` pour diagnostiquer un Pod qui ne démarre pas car son volume est encore attaché à un ancien node.
 - **`emptyDir.medium: Memory`** = tmpfs, compté dans les `limits.memory` du Pod (peut causer OOMKill).
 - Un **StatefulSet supprimé** ne supprime pas ses PVC. Cleanup : `kubectl delete pvc -l app=<name>`.

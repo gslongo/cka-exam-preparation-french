@@ -58,6 +58,12 @@ k create cm app --from-literal=key=value --from-file=./config.txt $do
 k create secret generic db --from-literal=password=s3cr3t $do
 k create secret docker-registry regcred \
   --docker-server=... --docker-username=... --docker-password=... $do
+# Variantes --from-* (piège exam) :
+#   --from-literal=k=v        → 1 clé k
+#   --from-file=config.js     → clé = NOM du fichier, valeur = contenu
+#   --from-file=app=config.js → clé custom "app"
+#   --from-file=dir/          → 1 clé par fichier du dossier
+#   --from-env-file=f.env     → 1 clé par ligne KEY=val  (≠ --from-file !)
 
 # RBAC
 k create role dev --verb=get,list,watch --resource=pods $do

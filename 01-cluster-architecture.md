@@ -52,7 +52,7 @@
 | **Container Runtime** | `containerd` (par défaut), `CRI-O`. **Plus de Docker depuis 1.24** |
 
 > 💡 **Version 1.24+** : `dockershim` supprimé. Le runtime doit implémenter directement l'interface **CRI**.
-> 💡 **Version 1.29+** : `kube-proxy` supporte le mode `nftables` (stable en 1.31).
+> 💡 **Version 1.29+** : `kube-proxy` supporte le mode `nftables` (alpha 1.29, beta 1.31, **GA 1.33**).
 
 > 📝 **kubelet en détail** : reçoit la **PodSpec** (YAML/JSON du Pod désiré) via l'apiserver et met le node **en conformité** avec cette spec :
 > - orchestre la création des conteneurs (via CRI),
@@ -345,6 +345,35 @@ cgroupDriver: systemd     # doit correspondre au runtime (containerd)
 - Perte de **quorum** = cluster read-only. Toujours **3+ membres impairs**.
 - Ne **jamais** sauvegarder pendant un `defrag` en cours.
 
+### 🔒 Encryption at rest des Secrets (etcd)
+
+Par défaut, les Secrets sont stockés **en clair** dans etcd (juste base64). Pour les chiffrer :
+
+1. Créer un `EncryptionConfiguration` sur le **control-plane node** (ex : `/etc/kubernetes/enc/enc.yaml`) :
+   ```yaml
+   apiVersion: apiserver.config.k8s.io/v1
+   kind: EncryptionConfiguration
+   resources:
+     - resources: [secrets]           # types à chiffrer
+       providers:
+         - aescbc:                     # 1er provider = celui qui CHIFFRE les writes
+             keys:
+               - name: key1
+                 secret: <clé 32 octets en base64>   # head -c 32 /dev/urandom | base64
+         - identity: {}               # fallback = pas de chiffrement (lecture legacy)
+   ```
+2. Ajouter au manifest **static pod** du kube-apiserver (`/etc/kubernetes/manifests/kube-apiserver.yaml`) :
+   `--encryption-provider-config=/etc/kubernetes/enc/enc.yaml` + monter le volume hostPath. L'apiserver redémarre seul.
+3. Ré-encrypter les Secrets **déjà présents** (le chiffrement n'agit qu'au write) :
+   ```bash
+   kubectl get secrets -A -o json | kubectl replace -f -
+   ```
+
+> 💡 **Ordre des providers = clé de la rotation** : le **premier** chiffre, **tous** sont essayés au déchiffrement. Rotation = mettre la nouvelle clé en tête → restart apiserver → re-`replace` tous les secrets → retirer l'ancienne clé.
+> - `identity` en tête = **déchiffre tout en clair** (pour désactiver).
+> - Providers : `identity` (aucun), `aescbc`, `aesgcm`, `secretbox`, `kms` v1/v2 (**recommandé prod**, ex : AWS KMS côté EKS).
+> - Vérifier le chiffrement réel : `ETCDCTL_API=3 etcdctl get /registry/secrets/<ns>/<name>` → doit être illisible (préfixe `k8s:enc:aescbc:...`).
+
 ## 🔗 Docs officielles autorisées
 
 - [Concepts / Overview](https://kubernetes.io/docs/concepts/overview/components/)
@@ -353,4 +382,5 @@ cgroupDriver: systemd     # doit correspondre au runtime (containerd)
 - [Upgrading kubeadm clusters](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/)
 - [Certificate management with kubeadm](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-certs/)
 - [Operating etcd clusters](https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/)
+- [Encrypting Secret Data at Rest](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/)
 - [Container Runtimes](https://kubernetes.io/docs/setup/production-environment/container-runtimes/)

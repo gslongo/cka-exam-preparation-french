@@ -86,6 +86,7 @@ _Dernière mise à jour : 2026-07-31_
 | W10 | Changer le **`selector` d'un Deployment** | `spec.selector.matchLabels` est **immuable** → `apply` échoue (`field is immutable`). Il faut **supprimer et recréer** le Deployment. |
 | W11 | `selector` qui ne **matche pas** `template.labels` | À la création : `selector does not match template labels`. Le `selector` doit être un **sous-ensemble** des labels du `template`. Piège #1 en écrivant un Deployment à la main. |
 | W12 | `imagePullPolicy` par défaut dépend du **tag** | Tag fixe (`nginx:1.25`) → `IfNotPresent`. Tag `:latest` ou **absent** → `Always` (re-pull à chaque fois). Surprise en debug d'image cachée. |
+| W13 | `--from-file` vs `--from-env-file` pour ConfigMap/Secret | `--from-file=f` = **1 clé = nom du fichier**, valeur = tout le contenu. `--from-env-file=f` = **1 clé par ligne** `KEY=val`. Se tromper crée une structure inexploitable par `configMapKeyRef`. |
 
 ---
 
@@ -114,6 +115,7 @@ _Dernière mise à jour : 2026-07-31_
 | D4 | `storageClassName: ""` vs absent | `""` (vide) = pas de provisioning dynamique (binding manuel). Absent = StorageClass par défaut. |
 | D5 | Oublier `accessModes` ou `resources.requests.storage` | Les 2 champs minimaux obligatoires d'un PVC. |
 | D6 | `reclaimPolicy` : Delete efface les données | `Retain` conserve le PV/données après suppression du PVC. |
+| D7 | Nom de ressource invalide / mauvais suffixe de taille | Noms K8s = **minuscules** RFC 1123 (`10Gpv01` ❌ → `pv01`) : `Invalid value ... a lowercase RFC 1123 subdomain`. Quantité **case-sensitive** : `Gi`/`Mi` (`8GI`/`150mi` ❌) : serveur rejette avec `quantities must match the regular expression '^([+-]?[0-9.]+)([eEinumkKMGTP]*...)$'`. |
 
 ---
 
@@ -147,12 +149,13 @@ _Dernière mise à jour : 2026-07-31_
 | Service | `spec.clusterIP` | delete/recreate ; `type`/`ports`/`selector` sont **mutables** |
 | Pod | quasi tout `spec` | Pod = immuable par design → on le **remplace** ; exceptions mutables : `image` (`set image`), `tolerations` (ajout), resize CPU/mém (1.33+) |
 | PVC | `spec.resources.requests.storage` | **agrandir** possible si `allowVolumeExpansion: true` (jamais réduire) |
-| PV | `capacity`, `accessModes` (en pratique) | delete/recreate |
+| PV | `capacity`, `accessModes` (en pratique) | delete/recreate ; `nodeAffinity` devenu **mutable en 1.35** (avant : immuable) |
 | Job | `spec.template`, `spec.selector`, `completions` | delete/recreate |
 | ConfigMap / Secret | rien **sauf** `immutable: true` posé volontairement | delete/recreate ; `immutable: true` = choix **perf** (kubelet arrête de watcher) |
 
 > ⚠️ Piège Kustomize lié : `commonLabels` / `labels` avec `includeSelectors: true` injectent le label **dans le selector** → `apply -k` casse un Deployment déjà déployé (selector immuable). Cf. fiche 02 §Kustomize.
 > ⚠️ Nuance Service : le `selector` d'un **Service** EST mutable ; celui d'un **Deployment/RS** ne l'est pas. Ne pas confondre.
+> 🆕 **1.35** : `PersistentVolume.spec.nodeAffinity` est passé **mutable** (KEP #134339). Concerne surtout les PV `local` (affinité node). Faible valeur examinable mais version-spécifique CKA 1.35.
 
 ---
 
