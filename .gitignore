@@ -1,0 +1,37 @@
+# ─────────────────────────────────────────────────────────────
+# Matériel sous copyright Linux Foundation — NE JAMAIS committer
+# (PDF de labs LFS258 + extractions texte)
+# ─────────────────────────────────────────────────────────────
+materials/
+*.pdf
+
+# ─────────────────────────────────────────────────────────────
+# Notes personnelles (progression, scores, config agent)
+# → supprime ces lignes si ton repo est privé et que tu veux les garder
+# ─────────────────────────────────────────────────────────────
+LFS258-progress.md
+LFS158-progress.md
+TOPICS-A-TRAVAILLER.md
+AGENT-INSTRUCTIONS.md
+
+# ─────────────────────────────────────────────────────────────
+# Bruit OS / éditeur
+# ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# ─────────────────────────────────────────────────────────────
+# Artefacts Vagrant (si tu lances les VM depuis lab-setup/)
+# ─────────────────────────────────────────────────────────────
+.vagrant/
+
+# ─────────────────────────────────────────────────────────────
+# Mémoire agent (si présente dans le repo)
+# ─────────────────────────────────────────────────────────────
+.memories/
+memories/

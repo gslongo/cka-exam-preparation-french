@@ -1,0 +1,39 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+#
+# Cluster CKA — 1 CP + 2 workers, K8s 1.35, Calico
+# Usage : vagrant up --no-parallel
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "bento/ubuntu-22.04"
+  config.vm.box_check_update = false
+
+  # Provisioning commun à toutes les VMs (runtime + kubeadm)
+  config.vm.provision "shell", path: "install-common.sh"
+
+  # --- Control plane ---
+  config.vm.define "cp1" do |cp|
+    cp.vm.hostname = "cp1"
+    cp.vm.network "private_network", ip: "192.168.56.10"
+    cp.vm.provider "virtualbox" do |vb|
+      vb.name   = "cka-cp1"
+      vb.cpus   = 2
+      vb.memory = 2048
+    end
+    cp.vm.provision "shell", path: "init-cp.sh"
+  end
+
+  # --- Workers ---
+  (1..2).each do |i|
+    config.vm.define "w#{i}" do |w|
+      w.vm.hostname = "w#{i}"
+      w.vm.network "private_network", ip: "192.168.56.#{10 + i}"
+      w.vm.provider "virtualbox" do |vb|
+        vb.name   = "cka-w#{i}"
+        vb.cpus   = 2
+        vb.memory = 2048
+      end
+      w.vm.provision "shell", path: "join-worker.sh"
+    end
+  end
+end
