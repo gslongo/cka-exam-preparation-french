@@ -41,6 +41,14 @@ graph LR
 | `ExternalName` | Alias DNS CNAME | ø | Redirect DNS vers service externe |
 | **Headless** (`clusterIP: None`) | Interne | ø | StatefulSet, gRPC direct |
 
+> **Layering** : `LoadBalancer` ⊃ `NodePort` ⊃ `ClusterIP` — un Service LoadBalancer alloue **aussi** un nodePort + un ClusterIP (donc joignable via `<NodeIP>:<nodePort>` même sans LB).
+>
+> ⚠️ **LoadBalancer `<pending>`** : sans cloud-controller-manager (bare-metal, kubeadm nu), `EXTERNAL-IP` reste `<pending>` — le Service marche en interne comme un NodePort. Vraie IP externe on-prem → **MetalLB**. Piège de troubleshooting classique.
+>
+> 💡 **`kubectl proxy`** (≠ type de Service) : proxy local authentifié vers l'API pour joindre un ClusterIP depuis l'extérieur sans l'exposer → `http://localhost:8001/api/v1/namespaces/<ns>/services/<svc>:<port>/proxy/`. Debug/dev uniquement.
+>
+> Le **range** des ClusterIP est fixé au démarrage de l'apiserver via `--service-cluster-ip-range` ; celui des **NodePort** (`30000-32767` par défaut) via `--service-node-port-range`.
+
 #### Anatomie d'un Service `NodePort` (piège classique)
 
 Un Service `type: NodePort` cumule **3 niveaux** :
@@ -56,6 +64,21 @@ Un Service `type: NodePort` cumule **3 niveaux** :
 > - "NodePort configure un LoadBalancer cloud" → **FAUX** (c'est `type: LoadBalancer`)
 > - "Port ouvert seulement sur les nodes où tournent les Pods" → **FAUX** (ouvert partout)
 
+#### Session affinity
+
+- **Load balancing stateless** par défaut (round-robin/aléatoire selon le mode kube-proxy). Pour coller un client à un Pod : `spec.sessionAffinity: ClientIP` (défaut `None`) + `spec.sessionAffinityConfig.clientIP.timeoutSeconds` (défaut `10800` = 3 h).
+- ⚠️ Affinité par **IP source uniquement** — **pas de cookie** (ça c'est l'Ingress L7). Derrière un proxy/NAT qui masque l'IP client → tout le trafic colle au même Pod.
+
+#### Bascule de selector (blue/green manuel)
+
+Éditer le `spec.selector` d'un Service **rerroute le trafic instantanément** (kube-proxy recalcule les Endpoints) :
+
+- Pods `v1` labellisés `version: v1`, Service `selector: {app: web, version: v1}`.
+- Déployer `v2` (`version: v2`) **en parallèle** → aucun trafic (non matché).
+- Tester `v2`, puis `kubectl set selector svc/web 'app=web,version=v2'` → **bascule atomique**, pas de versions mixtes. Rollback = re-bascule vers `v1`.
+
+> ⚠️ vs rolling update d'un Deployment qui **mélange** v1/v2 pendant la transition ; la bascule de selector est **tout-ou-rien**. Un selector qui ne matche plus aucun Pod `Ready` = Service **sans Endpoints** (503).
+
 ### Endpoints & EndpointSlices
 
 - Un Service `matchLabels` → **Endpoints** (liste d'IPs de Pods `Ready`)
@@ -63,6 +86,27 @@ Un Service `type: NodePort` cumule **3 niveaux** :
 - Un Pod `Not Ready` n'apparaît pas dans les endpoints (donc pas de trafic)
 
 > 💡 Piège classique : Service sans Endpoints → **le selector ne matche aucun Pod Ready**. Vérifier avec `kubectl get ep <svc>`.
+
+#### Trouver le vrai port d'écoute (troubleshoot)
+
+Symptôme trompeur : **endpoints présents** mais `curl` refusé → le `targetPort` du Service ne tape pas le port réel d'écoute de l'appli. `containerPort` dans le manifest est **purement documentaire** et peut mentir. La seule preuve = ce que le process a `bind()` dans le Pod.
+
+```bash
+# Vérité terrain : sockets en LISTEN + process (dans le Pod)
+kubectl exec <pod> -- ss -ltnp          # nginx → 0.0.0.0:80
+kubectl exec <pod> -- netstat -ltnp     # fallback
+
+# Image nue (ni ss ni netstat) : /proc en hexa (0050=80, 1F90=8080)
+kubectl exec <pod> -- cat /proc/net/tcp
+
+# Confirmation fonctionnelle
+kubectl exec <pod> -- curl -s -o /dev/null -w '%{http_code}\n' localhost:80
+
+# Image distroless : ephemeral debug container partageant le netns
+kubectl debug -it <pod> --image=nicolaka/netshoot --target=<container> -- ss -ltnp
+```
+
+> ⚠️ `containerPort`, la spec du Service et la doc sont **déclaratifs** → peuvent diverger du runtime. `ss -ltnp` (ou `kubectl debug --target`) = **seule preuve directe**. Fix : `--target-port` = vrai port d'écoute (cf. piège N9).
 
 ### kube-proxy — modes
 
@@ -101,6 +145,8 @@ Un Service `type: NodePort` cumule **3 niveaux** :
     loadbalance
 }
 ```
+
+> 💡 **Recharger une modif de Corefile** : le plugin `reload` poll le fichier (~30 s + jitter), et la propagation ConfigMap→volume monté ajoute ~60-90 s (sync kubelet). Pour appliquer vite : `kubectl -n kube-system rollout restart deploy coredns` (jamais `scale 0`). `prometheus :9153` = endpoint métriques (port `9153/TCP` du Service `kube-dns`, à scraper). Plugin `rewrite` = réécrit questions/réponses DNS (`rewrite stop { name regex ... answer name ... }`).
 
 - `Pod.spec.dnsPolicy` : `ClusterFirst` (défaut), `Default` (utilise resolv.conf du node), `None` (+ `dnsConfig` custom)
 
@@ -279,6 +325,7 @@ spec:
 ### DNS
 - Résolution en `A` d'un Service **Headless** → renvoie **toutes les IPs de Pods** (round-robin côté client)
 - `search` du resolv.conf ajouté par K8s : `<ns>.svc.cluster.local svc.cluster.local cluster.local` — les FQDNs finis par `.` évitent la recherche.
+- **`ndots:5`** (resolv.conf) : un nom avec **< 5 points** essaie d'abord tous les `search` domains → plusieurs lookups NXDOMAIN avant l'absolu. FQDN terminé par `.` = résolution directe (perf + moins de charge CoreDNS). Piège latence classique.
 - CoreDNS `loop` plugin détecte les loops de forward → CrashLoop si mal configuré.
 
 ### Ingress

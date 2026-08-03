@@ -103,6 +103,9 @@ Un `PersistentVolumeClaim` spécifie **au minimum 2 champs obligatoires** :
 | `Delete` | PV **et** volume backend supprimés (défaut pour dynamic) |
 | `Recycle` | **Deprecated**, ne pas utiliser |
 
+- Changer la policy d'un PV **live** : `kubectl patch pv <name> -p '{"spec":{"persistentVolumeReclaimPolicy":"Delete"}}'`.
+- ⚠️ **NFS n'a pas de deleter plugin** : `reclaimPolicy: Delete` sur un PV NFS statique → supprimer le PVC laisse le PV en statut **`Failed`** (les backends block/cloud, eux, ont un plugin). Préférer `Retain` + nettoyage manuel.
+
 ### Cycle de vie : workload vs stockage
 
 > Le stockage est **découplé** du workload. Supprimer/recréer un Deployment ne touche **jamais** aux PVC/PV. Seule la suppression du **PVC** (+ la `reclaimPolicy`) détruit un PV.
@@ -289,6 +292,7 @@ spec:
 - **Node avec `volumeAttachments` en attente** : `k get volumeattachment` pour diagnostiquer un Pod qui ne démarre pas car son volume est encore attaché à un ancien node.
 - **`emptyDir.medium: Memory`** = tmpfs, compté dans les `limits.memory` du Pod (peut causer OOMKill).
 - Un **StatefulSet supprimé** ne supprime pas ses PVC. Cleanup : `kubectl delete pvc -l app=<name>`.
+- **ResourceQuota storage** : `persistentvolumeclaims` (nombre) et `requests.storage` (somme des tailles demandées) sont contrôlés **à la création du PVC uniquement** — jamais rétroactivement (un quota abaissé sous l'usage courant affiche `used > hard` sans rien casser). ⚠️ **NFS : l'usage disque réel n'est PAS compté** (seul le `requests.storage` déclaré du PVC l'est). Un Deployment qui réutilise un PVC existant ne déclenche **aucun** contrôle. Contrairement au quota *compute*, le quota storage **n'exige pas** de LimitRange (piège LFS258).
 
 ## 🔗 Docs officielles autorisées
 

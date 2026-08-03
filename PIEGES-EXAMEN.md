@@ -87,6 +87,7 @@ _Dernière mise à jour : 2026-07-31_
 | W11 | `selector` qui ne **matche pas** `template.labels` | À la création : `selector does not match template labels`. Le `selector` doit être un **sous-ensemble** des labels du `template`. Piège #1 en écrivant un Deployment à la main. |
 | W12 | `imagePullPolicy` par défaut dépend du **tag** | Tag fixe (`nginx:1.25`) → `IfNotPresent`. Tag `:latest` ou **absent** → `Always` (re-pull à chaque fois). Surprise en debug d'image cachée. |
 | W13 | `--from-file` vs `--from-env-file` pour ConfigMap/Secret | `--from-file=f` = **1 clé = nom du fichier**, valeur = tout le contenu. `--from-env-file=f` = **1 clé par ligne** `KEY=val`. Se tromper crée une structure inexploitable par `configMapKeyRef`. |
+| W14 | `envFrom` sur un ConfigMap/Secret dont des clés ne sont pas des noms de variables valides | Clés avec `.`/`-` (ex `car.make`) = **invalides** comme env vars → K8s les **skippe silencieusement** (event `InvalidVariableNames`), le Pod démarre quand même sans elles. En **volume** ces mêmes clés passent (noms de fichiers OK). Vérifier avec `kubectl describe pod`. |
 
 ---
 
@@ -102,6 +103,8 @@ _Dernière mise à jour : 2026-07-31_
 | N6 | Ingress sans **Ingress Controller** | La règle Ingress ne sert à rien sans controller déployé. |
 | N7 | Oublier `pathType` (obligatoire en `networking.k8s.io/v1`) | `Prefix` le plus courant. |
 | N8 | DNS : mauvais **FQDN** | `<svc>.<ns>.svc.cluster.local`. Debug via un Pod `busybox` + `nslookup`. |
+| N9 | Croire que `containerPort` ouvre/configure un port | `containerPort` est **purement documentaire** — l'appli écoute où elle veut (nginx=80). `kubectl expose` **sans `--port`** reprend le `containerPort` comme `port`+`targetPort` → si l'appli n'écoute pas là, **endpoints OK mais connexion refusée**. Fix : `--target-port` = **vrai** port d'écoute. |
+| N10 | Confondre « DNS résout » et « Service a des endpoints » | Un Service **ClusterIP** résout **toujours** vers sa ClusterIP, **même sans Pod matché** (CoreDNS crée un A record par Service existant). Donc un souci de **résolution** (NXDOMAIN) = namespace (short name cross-ns), Service inexistant, ou CoreDNS KO — **pas** les selectors. Les selectors/labels cassent les **endpoints** → « connexion refusée/timeout », **pas** « ne résout pas ». Exception : Service **headless** (sans endpoints → pas d'A record). |
 
 ---
 
