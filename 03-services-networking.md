@@ -165,14 +165,95 @@ graph LR
 
 - **Ingress** = ressource L7 (règles host/path → Service)
 - Nécessite un **Ingress Controller** (nginx, Traefik, HAProxy, cloud provider)
-- Depuis 1.19 : `apiVersion: networking.k8s.io/v1`, `pathType` **obligatoire** (`Prefix`, `Exact`, `ImplementationSpecific`)
+- Depuis 1.19 : `apiVersion: networking.k8s.io/v1`, `pathType` **obligatoire**. Trois valeurs :
+  - `Prefix` : match par segments `/` (ex. `/api` matche `/api`, `/api/v1`, **pas** `/apiv1`). Le plus courant à l'exam.
+  - `Exact` : match **strict** de l'URL (sensible à la casse, pas de sous-chemin).
+  - `ImplementationSpecific` : le **controller décide** (nginx ≈ Prefix + regex ; GCE traite différemment). Non portable entre controllers.
+- 🎨 *Test local* : `<host>.<IP>.nip.io` (ex. `ghost.192.168.99.100.nip.io`) → DNS wildcard qui résout vers `<IP>` sans config DNS. Pratique minikube, hors exam.
 - `IngressClass` : permet plusieurs controllers dans un même cluster
+- **Sélection du controller** : champ moderne `spec.ingressClassName: nginx` (remplace l'annotation dépréciée `kubernetes.io/ingress.class`). Une IngressClass marquée `ingressclass.kubernetes.io/is-default-class: "true"` s'applique aux Ingress **sans** `ingressClassName`.
+- **Default backend** : destination **catch-all** pour les requêtes ne matchant **aucune** règle → renvoie typiquement **404**. Existe au niveau du controller (`default-http-backend`, fallback global) et au niveau d'un Ingress via `spec.defaultBackend` (backend par défaut sans `rules`). ⚠️ Un 404 sur un host/path censé exister = la requête tombe sur le default backend (règle/`host`/`pathType` KO), pas l'app.
+- **Deux patterns de routing** (un même Ingress peut combiner les deux) :
+  - **Name-based virtual hosting** : un `host:` distinct par règle → `a.example.com → svcA`, `b.example.com → svcB`. Le controller route sur l'en-tête `Host:`.
+  - **Simple fanout (path-based)** : un **seul** `host`, plusieurs `paths` → `app.com/api → svcA`, `app.com/web → svcB`.
+
+#### Réflexes hands-on (déploiement + test)
+
+- **Installer un controller** (nginx) via Helm : `helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx` → `helm repo update` → `helm install myingress ingress-nginx/ingress-nginx`. Pour 1 pod par node : `values.yaml` `controller.kind: DaemonSet` (défaut = Deployment).
+- Le controller expose un **Service `LoadBalancer`** (`80:<nodePort>/TCP,443:<nodePort>/TCP`). Sur kubeadm l'`EXTERNAL-IP` reste `<pending>` (pas de cloud LB) → on teste via **ClusterIP**, **IP de Pod**, ou **nodePort**.
+- **🔑 Tester un Ingress name-based** : `curl -H "Host: www.example.com" http://<IP-controller>`. **Sans** le bon `Host:` → **404** (aucune règle ne matche → default backend nginx, *pas* l'app). C'est le test/debug type.
+- **404 vs 503** (ingress-nginx) : **404** = aucune règle ne matche (`Host:`/path KO) → default backend. **503** = la règle **matche** mais le **backend Service n'a aucun endpoint** (Service absent, Pods `NotReady`, selector KO). Réflexe 503 → `kubectl get endpointslices -l kubernetes.io/service-name=<svc>`.
+- Service **`<release>-controller-admission`** (ClusterIP:443) = ValidatingWebhook qui valide les objets `Ingress` à la création (peut bloquer un apply si la règle est invalide).
+
+#### Deux modèles de controller (in-cluster vs cloud-native)
+
+```mermaid
+graph TB
+    subgraph M1["Modèle 1 — Controller in-cluster (nginx/Traefik) · attendu au CKA"]
+        direction LR
+        C1[Client] --> LB1["Cloud LB / NodePort<br/>(L4)"]
+        LB1 --> IC1["Pods Ingress Controller<br/>nginx (L7 : host/path)"]
+        IC1 -->|rule| S1[Service ClusterIP]
+        S1 --> P1[Pods app]
+    end
+    subgraph M2["Modèle 2 — Cloud-native (AWS ALB / GLBC) · ton monde EKS"]
+        direction LR
+        C2[Client] --> ALB["ALB / Google LB<br/>(L7 : host/path)"]
+        ALB --> P2[Pods app]
+        CTRL["Controller Pod<br/>(aws-lb-controller)"] -.->|programme via API cloud| ALB
+    end
+```
+
+- **Modèle 1 (empilé)** : le LB cloud (L4) **et** les Pods nginx (L7) coexistent. Le LB **ne fait qu'amener** le trafic aux Pods du controller ; ce sont **les Pods nginx** qui lisent les `Ingress` et routent par host/path. Le LB est le **moyen d'exposer** nginx (via son Service `LoadBalancer`/`NodePort`), pas un remplaçant. **1 seul LB frontal** dessert N Ingress (l'économie vs 1 LB par app).
+- **Modèle 2 (remplacement)** : le **LB cloud fait lui-même le L7**. Le controller-pod (`aws-load-balancer-controller`) ne voit **jamais** le trafic — c'est un **agent de config** (control plane) qui **programme** l'ALB via l'API cloud. Data plane = l'ALB seul.
+- CKA suppose le **modèle 1** (nginx exposé en NodePort sur kubeadm). Analogie : nginx-ingress = un reverse proxy nginx dans le cluster, avec le LB devant comme un NLB devant une VM nginx.
+
+- **Limites du spec Ingress** (→ motivent Gateway API) : HTTP/HTTPS L7 seulement. Pas de natif pour **TCP/UDP/gRPC brut**, **routing par header**, ni **canary/traffic-splitting**. Ces besoins = **annotations propres au controller** (`nginx.ingress.kubernetes.io/...`) = **vendor lock-in**. (nginx *peut* le faire via ConfigMap/annotations, mais hors spec → non portable.)
 
 ### Gateway API (2024+)
 
 - Successeur d'Ingress, **GA en 1.31** (pour `Gateway`, `HTTPRoute`, `GatewayClass`)
+- **API group** : `gateway.networking.k8s.io/v1` (⚠️ ≠ Ingress `networking.k8s.io/v1` — piège d'`apiVersion`).
+- **Kinds standard** (5) : `GatewayClass`, `Gateway`, `HTTPRoute`, `GRPCRoute`, `ReferenceGrant` (ce dernier = autorise un `*Route` à référencer un backend dans **un autre namespace**).
 - Séparation des rôles : `GatewayClass` (admin), `Gateway` (platform), `HTTPRoute` (dev)
+- **`GatewayClass`** : **cluster-scoped** (comme `IngressClass`/`StorageClass`). Champ clé `spec.controllerName` = l'implémentation (ex. `example.com/gateway-controller`). Équivaut à `spec.controller` d'`IngressClass`. Créé par l'admin ; le dev ne fait que le référencer depuis un `Gateway`.
+- **`Gateway`** : **namespacé**, la « front door ». Champ `spec.gatewayClassName` → référence la `GatewayClass`. Définit les **`listeners`** (`protocol` HTTP/HTTPS/TCP + `port`, TLS termination).
+- **`HTTPRoute`** : **namespacé** (dev). `parentRefs` → Gateway, `hostnames`, `rules[].matches` (path **+ headers + query**) + `rules[].backendRefs[].name/port` → Service. ⚠️ Match path = **`matches[].path.type: PathPrefix`** (valeurs `Exact`/`PathPrefix`/`RegularExpression`) — **≠** Ingress `pathType: Prefix` (mot + champ différents). Canary natif via `backendRefs[].weight` (plus d'annotation vendor).
 - CKA v1.35 : **Ingress toujours attendu**, mais le cours fait désormais Gateway API **en hands-on** (NGINX Gateway Fabric). Structure : `Gateway` (listeners: port/protocol) + `HTTPRoute` (`parentRefs` → le Gateway, `hostnames`, `rules` avec `backendRefs` → Service). Officiellement borderline, mais monte en importance.
+
+```mermaid
+graph TB
+    subgraph cluster["Cluster-scoped · admin"]
+        GC["GatewayClass<br/>spec.controllerName"]
+    end
+    subgraph ns["Namespacé · platform + dev"]
+        GW["Gateway<br/>spec.gatewayClassName<br/>listeners: protocol + port"]
+        HR["HTTPRoute<br/>hostnames + rules"]
+        SVC[Service]
+    end
+    IMPL[/"Implémentation<br/>(NGINX GF, Istio, cloud…)"/]
+    HR -->|parentRefs| GW
+    GW -->|gatewayClassName| GC
+    GC -->|controllerName| IMPL
+    HR -->|backendRefs| SVC
+```
+
+> 🔑 Chaîne de refs (chaque niveau pointe vers le précédent) : `HTTPRoute` --parentRefs--> `Gateway` --gatewayClassName--> `GatewayClass` --controllerName--> implémentation. `HTTPRoute` --backendRefs--> `Service`.
+
+#### Déploiement from zero (NGINX Gateway Fabric)
+
+1. **CRDs** Gateway API (`kubectl apply .../standard-install.yaml`) → juste le vocabulaire, rien de runtime.
+2. **Implémentation** (NGINX GF) → crée le **controller** (Deployment, control plane) + une **`GatewayClass` `nginx`**. ⚠️ Pas encore de proxy qui tourne.
+3. Tu déploies l'**implémentation** → selon la version : soit un **nginx partagé** créé **dès l'install** (NGINX GF **1.x** : control plane + data plane **co-localisés**, 1 pod `2/2` + Service, **avant** tout `Gateway`), soit le data plane **provisionné par `Gateway`** à la demande (Istio, NGINX GF **2.x**). Vérifier : `kubectl get all -n nginx-gateway`.
+4. App + `Service` ClusterIP (`kubectl expose`).
+5. **`HTTPRoute`** → le controller **génère `nginx.conf`** et le pousse dans les Pods nginx.
+
+> 🔑 **Deux Services empilés** (modèle in-cluster) : `Client → Service(LB) du Gateway → Pods nginx (L7) → Service(ClusterIP) app → Pods app`. Le proxy nginx tape **le Service** de l'app (via `backendRefs`), pas directement les Pods. ⚠️ Le **provisioning du data plane** est **implementation-specific** : nginx partagé installé en amont (NGINX GF 1.x) **ou** une instance par `Gateway` (Istio, NGINX GF 2.x).
+
+#### Réflexes hands-on Gateway API
+
+- **Tester** : `curl --resolve <host>:<port>:<nodeIP> http://<host>:<port>/` (mappe le hostname → IP + fixe SNI ; mieux que `-H "Host:"` en HTTPS). Hostname non matché → **404**.
+- **Statut** : `kubectl get gateway` → `PROGRAMMED: True` = le controller a accepté/configuré. Changer le type du Service : `kubectl patch svc <n> -n <ns> -p '{"spec":{"type":"NodePort"}}'`.
 
 ### CNI plugins
 

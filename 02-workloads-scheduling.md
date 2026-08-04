@@ -135,6 +135,17 @@ sequenceDiagram
 
 ### Scheduling
 
+**Cycle du kube-scheduler** (watch les Pods sans `nodeName`) :
+
+1. **Filtering** (predicates) : écarte les nodes infaisables (ressources, taint non toléré, `nodeSelector`, `unschedulable`).
+2. **Scoring** (priorities) : note les nodes restants → prend le meilleur.
+3. **Binding** : écrit un objet `Binding` (= `pod.spec.nodeName`) sur l'API server → le **kubelet** du node crée les conteneurs.
+
+- Aucun node faisable → Pod **`Pending`** + event `FailedScheduling` (`kubectl describe pod` / `get events`). Pas d'erreur bloquante, il attend.
+- **`spec.schedulerName`** : utilise un scheduler custom au lieu du `default-scheduler` (multiple schedulers en parallèle).
+  - ⚠️ Si le scheduler nommé **n'est pas déployé** → Pod `Pending` **sans event `FailedScheduling`** (aucun scheduler ne watch ce Pod). Diagnostic : vérifier `spec.schedulerName` (≠ Pending classique par manque de ressources, qui lui génère `FailedScheduling`).
+- **Scheduling profiles** (`KubeSchedulerConfiguration`, via `--config`) : active/désactive des plugins de filtering/scoring et ajuste leurs poids, sans scheduler custom. Sur kubeadm le scheduler est un **static Pod** (`/etc/kubernetes/manifests/kube-scheduler.yaml`). Borderline CKA — connaître le terme suffit.
+
 | Mécanisme | Sens | Portée |
 |---|---|---|
 | `nodeSelector` | Pod → Node (labels exacts) | Simple |
@@ -149,9 +160,19 @@ sequenceDiagram
 - `PreferNoSchedule` : évite si possible
 - `NoExecute` : évince les Pods existants
 
+- **`tolerationSeconds`** (seulement avec `NoExecute`) : le Pod toléré reste N secondes avant éviction (sans = immédiat).
+- **Taint-based evictions** : le node-controller pose auto des taints `NoExecute` sur node malade (`node.kubernetes.io/not-ready`, `unreachable`, `disk-pressure`…) ; K8s injecte une toleration **300 s** par défaut → délai avant reschedule quand un node tombe. ⚠️ Ces évictions **ne respectent pas les PodDisruptionBudgets** (contrairement à `drain`).
+
 Exemple : les control plane ont par défaut `node-role.kubernetes.io/control-plane:NoSchedule`.
 
+**Affinity — `required` vs `preferred`** :
+- `requiredDuringSchedulingIgnoredDuringExecution` = **hard** : obligatoire au scheduling, sinon Pod **`Pending`** (garantie).
+- `preferredDuringSchedulingIgnoredDuringExecution` = **soft** : simple préférence (scoring), planifie ailleurs si besoin.
+- `IgnoredDuringExecution` = évalué **au scheduling seulement** → changer les labels du node **après** ne réévince pas le Pod.
+
 > 💡 Question piège : un Pod sans `tolerations` peut être planifié sur un node **cordoned** ? **Non** — `cordon` = `unschedulable=true`, complètement différent des taints.
+
+> 🔑 **K8s ne rééquilibre jamais les Pods déjà planifiés.** Le scheduler n'agit qu'à la **création** : un Pod reste sur son node jusqu'à sa suppression, même si un meilleur node se libère (ex. retirer un taint `NoExecute` ne ramène pas les Pods évincés ; scale-up de nodes ne migre pas les Pods existants). Rééquilibrage = projet **`descheduler`** (opt-in, pas natif).
 
 ### Requests, limits, QoS
 
@@ -608,6 +629,17 @@ spec:
     labelSelector: { matchLabels: { app: web } }
   containers: [{ name: c, image: nginx }]
 ```
+
+> 🔑 **Les 4 formes d'affinity ont des champs imbriqués différents** (piège à la rédaction — la doc `kubernetes.io` est autorisée à l'exam) :
+>
+> | Forme | Champ imbriqué | `topologyKey` |
+> |---|---|---|
+> | `nodeAffinity` **required** | `nodeSelectorTerms:` → `matchExpressions` | ❌ |
+> | `nodeAffinity` **preferred** | `preference:` → `matchExpressions` (+ `weight`) | ❌ |
+> | `podAffinity`/`podAntiAffinity` **required** | `labelSelector:` (+ `topologyKey`) | ✅ obligatoire |
+> | `podAffinity`/`podAntiAffinity` **preferred** | `podAffinityTerm:` → `{labelSelector, topologyKey}` (+ `weight`) | ✅ obligatoire |
+>
+> `weight` (1–100) existe **uniquement** en `preferred`. `required` est binaire (pas de weight).
 
 ```yaml
 # HPA v2 (CPU + custom metric)

@@ -77,6 +77,7 @@ _Dernière mise à jour : 2026-07-31_
 | W1 | Modifier un **champ immuable** d'un Pod avec `apply` | Erreur `field is immutable` → `kubectl replace -f f.yaml --force` (delete+recreate). |
 | W2 | Confondre **taint** et **toleration** | Taint = sur le **node** (repousse). Toleration = sur le **Pod** (laisse passer, **n'attire pas**). Pour forcer un placement → `nodeSelector`/affinity **en plus**. |
 | W3 | Oublier de **tolérer le taint du control plane** pour un DaemonSet global | `node-role.kubernetes.io/control-plane:NoSchedule`. |
+| W7 | Oublier **`topologyKey`** dans `podAffinity`/`podAntiAffinity` | Champ **obligatoire** dans chaque terme → sinon `error validating data: missing required field "topologyKey"`. Valeurs classiques : `kubernetes.io/hostname` (par node), `topology.kubernetes.io/zone` (par zone). ⚠️ N'existe **pas** dans `nodeAffinity` (Pod→Node, pas de domaine topologique). |
 | W4 | `kubectl run` crée un **Pod**, pas un Deployment | Depuis 1.18, `run` = Pod nu. Pour un Deployment → `kubectl create deployment`. |
 | W5 | Générer du YAML sans `--dry-run=client` | `k create ... --dry-run=client -o yaml > f.yaml` puis éditer. Gagne un temps fou. |
 | W6 | `rollout undo` sur mauvaise ressource | `kubectl rollout undo deployment/<x>` (+ `--to-revision=N`). Vérifie avec `rollout history`. |
@@ -105,6 +106,8 @@ _Dernière mise à jour : 2026-07-31_
 | N8 | DNS : mauvais **FQDN** | `<svc>.<ns>.svc.cluster.local`. Debug via un Pod `busybox` + `nslookup`. |
 | N9 | Croire que `containerPort` ouvre/configure un port | `containerPort` est **purement documentaire** — l'appli écoute où elle veut (nginx=80). `kubectl expose` **sans `--port`** reprend le `containerPort` comme `port`+`targetPort` → si l'appli n'écoute pas là, **endpoints OK mais connexion refusée**. Fix : `--target-port` = **vrai** port d'écoute. |
 | N10 | Confondre « DNS résout » et « Service a des endpoints » | Un Service **ClusterIP** résout **toujours** vers sa ClusterIP, **même sans Pod matché** (CoreDNS crée un A record par Service existant). Donc un souci de **résolution** (NXDOMAIN) = namespace (short name cross-ns), Service inexistant, ou CoreDNS KO — **pas** les selectors. Les selectors/labels cassent les **endpoints** → « connexion refusée/timeout », **pas** « ne résout pas ». Exception : Service **headless** (sans endpoints → pas d'A record). |
+| N11 | Confondre `pathType` (Ingress) et `path.type` (HTTPRoute) | Valeurs **différentes**. Ingress = `Prefix`/`Exact`/`ImplementationSpecific` sous `pathType`. HTTPRoute (Gateway API) = `PathPrefix`/`Exact`/`RegularExpression` sous `matches[].path.type`. Écrire `Prefix` dans un HTTPRoute (ou `PathPrefix` dans un Ingress) = rejet/no-match. |
+| N12 | Ingress : confondre **404** et **503** | **404** = aucune règle ne matche (mauvais/absent `Host:` ou path) → requête au **default backend**, *pas* à l'app. **503** = la règle **matche** mais le **backend Service n'a aucun endpoint** (Service inexistant, Pods `NotReady`, selector KO). Donc 503 = « le routing est bon, le backend est cassé » → `kubectl get endpointslices -l kubernetes.io/service-name=<svc>`. Ne pas debugger le `Host:` sur un 503. |
 
 ---
 

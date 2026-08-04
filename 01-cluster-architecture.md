@@ -139,6 +139,77 @@ Au-delà des composants « core », un cluster fait tourner des **add-ons** (sou
 > Le suffixe se lit dans l'`apiVersion` : `v1` (stable) → `apps/v1` ; `v1beta1` → `flowcontrol.apiserver.k8s.io/v1beta1`.
 > Nuance : « beta enabled by default » ne vaut que pour les **anciennes** beta APIs ; depuis **K8s 1.24**, les **nouvelles** beta APIs sont **désactivées** par défaut.
 
+### CRD & Custom Resources
+
+> 🆕 **Examinable CKA depuis 2025** (« Understand CRDs, install and configure operators », domaine Cluster Architecture). Niveau **admin/opérateur** : installer et utiliser, **pas** coder un controller.
+
+- **Custom Resource (CR)** = nouvel objet ajouté à l'API, stocké dans **etcd**, servi par le **kube-apiserver**, manipulé avec `kubectl` comme un objet natif.
+- **2 façons d'étendre l'API** :
+  - **CRD** (CustomResourceDefinition) : un simple YAML déclare un nouveau type. Simple, sans infra, le cas courant. ⭐ **C'est ce que teste le CKA.**
+  - **Aggregated API** : un serveur d'API dédié branché sur le kube-apiserver. Très flexible mais lourd (dev + infra). **Savoir que ça existe**, pas plus.
+- ⚠️ **RBAC** : une CRD ne donne **aucun droit** automatiquement. Il faut un `Role`/`ClusterRole` explicite sur le nouveau type (apiGroup de la CRD + `resources` = plural) pour que users/SA puissent l'utiliser.
+- **La CRD elle-même** appartient au group **`apiextensions.k8s.io/v1`** (`kind: CustomResourceDefinition`). Ne pas confondre avec le group **du CR** que tu déclares (`spec.group`, ex. `stable.example.com`).
+- **Champs clés d'un CRD** : `spec.group`, `spec.versions[]` (avec `schema` **OpenAPI v3** = validation des champs), `spec.scope` (**`Namespaced`** ou **`Cluster`**), `spec.names` (`kind`, `plural`, `singular`, `shortNames`).
+- **Operator** = CRD **+** controller custom (reconcile loop qui watch les CR et agit). La CRD seule ne fait **rien** — elle déclare juste un type ; c'est le controller qui lui donne un comportement.
+
+> 🔑 **Règle de nommage stricte** : `metadata.name` du CRD = **`<plural>.<group>`** (sinon rejet `metadata.name must be spec.names.plural+"."+spec.group`).
+
+```yaml
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: backups.stable.linux.com     # OBLIGATOIREMENT <plural>.<group>
+spec:
+  group: stable.linux.com
+  scope: Namespaced                  # ou Cluster
+  names:
+    plural: backups
+    singular: backup
+    kind: BackUp                     # utilisé dans le YAML des CR
+    shortNames: [bks]
+  versions:
+  - name: v1
+    served: true                     # exposée par l'API ?
+    storage: true                    # 1 seule version storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              target: { type: string }
+```
+
+> 🔑 **Le CR (l'instance)** utilise `apiVersion: <group>/<version>` (`stable.linux.com/v1`) et `kind:` = `spec.names.kind` — **pas** `apiextensions.k8s.io/v1` (ça, c'est la CRD, pas le CR).
+
+```yaml
+apiVersion: stable.linux.com/v1    # <group>/<version> du CRD
+kind: BackUp                       # = spec.names.kind
+metadata:
+  name: a-backup-object
+  namespace: default               # car scope: Namespaced
+spec:
+  timeSpec: "*/5 * * * *"
+  image: linux-backup-image
+```
+
+Validation : avec `schema` OpenAPI dans le CRD → K8s vérifie **type + format** (rejet si non conforme). Sans schema → vérifie seulement que les champs **existent**, erreurs reportées au controller.
+
+> Mots-clés de contrainte OpenAPI dans le schema : `pattern` (regex), `minimum`/`maximum`, `enum`, `required`, `minLength`/`maxLength`. Validation OpenAPI v3 stable depuis **v1.16**.
+
+**Réflexes CLI CRD/CR :**
+
+```bash
+kubectl get crd                          # lister les CRD (cluster-scoped)
+kubectl describe crd crontabs.stable.example.com
+kubectl create -f crd.yaml               # enregistre le type
+kubectl get crontabs   # = kubectl get CronTab = kubectl get ct (plural/kind/shortName)
+kubectl describe ct new-cron-object
+```
+
+> ⚠️ **`kubectl delete -f crd.yaml` supprime la CRD ET en cascade tous les CR de ce type** (tous les objets `CronTab`). Destruction massive silencieuse — attention en prod.
+
 ### RBAC
 
 ```mermaid

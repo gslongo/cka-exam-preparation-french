@@ -116,6 +116,7 @@ kubectl describe node <n>                    # Conditions, Allocatable, Taints, 
 - Fournit `kubectl top` (nodes, pods)
 - Deployment dans `kube-system`
 - Signes qu'il n'est **pas** installé : `error: Metrics API not available`
+- 🔎 **metrics-server = une Aggregated API** (`v1beta1.metrics.k8s.io`), enregistrée via un objet **`APIService`**. Si `kubectl top` échoue, vérifier : `kubectl get apiservices | grep metrics` → colonne `AVAILABLE` doit être `True` (sinon `False (MissingEndpoints/...)` = pod metrics-server KO ou aggregation layer HS).
 - ⭐ **Fix kubeadm récurrent — erreur TLS kubelet** : logs = `x509: cannot validate certificate ... doesn't contain any IP SANs`. metrics-server scrape le kubelet en HTTPS (port 10250) mais le certif kubelet est self-signed / sans IP SAN. Correctif :
 
     ```bash
