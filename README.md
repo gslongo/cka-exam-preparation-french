@@ -6,7 +6,9 @@
 **Durée exam** : 2 h · **Score** : ≥ 66 % · **Retake gratuit** : 1 · **Valide** : 2 ans · **Version exam** : K8s v1.35.
 
 > ⚠️ **Disclaimer** : notes de révision **personnelles**, non affiliées à la Linux Foundation ni à la CNCF. Elles reformulent des concepts publics Kubernetes ; **aucun contenu de lab LFS158/LFS258 sous copyright n'est reproduit ici** (les PDF du cours sont exclus via `.gitignore`). Vérifie toujours la [doc officielle](https://kubernetes.io/docs/) et le [curriculum CKA](https://github.com/cncf/curriculum) le jour J.
+
 > ✅ **Entraînement chrono** : [DOMAIN-REVIEW-CHECKLIST.md](DOMAIN-REVIEW-CHECKLIST.md) (50 tâches LFS258 Appendix A)
+
 > 🏆 **Stratégie & Top 15** : [shared/exam-strategy.md](shared/exam-strategy.md) (méthode, timing, bookmarks, PSI)
 
 ---
