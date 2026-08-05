@@ -10,6 +10,7 @@
 > 👉 **Comment travailler avec l'agent IA** : voir [HOWTO.md](HOWTO.md) (mémo utilisateur).
 > 🎯 **Topics à travailler** : [TOPICS-A-TRAVAILLER.md](TOPICS-A-TRAVAILLER.md) · **Questions probables** : [QUESTIONS-EXAMEN.md](QUESTIONS-EXAMEN.md) · **Pièges classiques** : [PIEGES-EXAMEN.md](PIEGES-EXAMEN.md)
 > ✅ **Entraînement chrono** : [DOMAIN-REVIEW-CHECKLIST.md](DOMAIN-REVIEW-CHECKLIST.md) (50 tâches LFS258 Appendix A)
+> 🏆 **Stratégie & Top 15** : [shared/exam-strategy.md](shared/exam-strategy.md) (méthode, timing, bookmarks, PSI)
 
 ---
 
@@ -44,6 +45,15 @@ CKA/                              ← workspace (ce dossier)
     ├── init-cp.sh
     └── join-worker.sh
 ```
+
+## 🧰 Ressources transverses
+
+- [00-cheatsheet.md](00-cheatsheet.md) — condensé imprimable (à relire J-1)
+- [shared/exam-strategy.md](shared/exam-strategy.md) — stratégie examen, Top 15, timing, bookmarks, PSI
+- [shared/kubectl-tips.md](shared/kubectl-tips.md) — réflexes kubectl, alias, JSONPath
+- [shared/yaml-snippets.md](shared/yaml-snippets.md) — YAML types prêts à copier
+- [shared/glossary.md](shared/glossary.md) — glossaire des termes K8s
+- [lab-setup/README.md](lab-setup/README.md) — monter un cluster kubeadm local (Vagrant, K8s 1.35)
 
 ## 📚 Domaines & pondération CKA (curriculum CNCF)
 

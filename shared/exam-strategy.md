@@ -5,6 +5,37 @@
 > ⚠️ La dernière stable upstream (ex : 1.36) n'est PAS forcément la version exam. Toujours revérifier la date d'exam approchant : docs.linuxfoundation.org/tc-docs/certification/faq-cka-ckad
 > Format : 2 h · 15-20 tâches pratiques · **passage 66 %** · 1 retake gratuit · killer.sh (2 sessions 36 h).
 
+## 🏆 Top 15 à savoir absolument
+
+> Synthèse priorisée (poids × fréquence × temps perdu si non maîtrisé). Le vrai tueur = **le temps**.
+
+**⚙️ Mécanique & vitesse**
+1. `kubectl` impératif + `--dry-run=client -o yaml` > YAML from scratch. Objectif <60 s/objet.
+2. Setup 20 s : `alias k=kubectl`, `export do='--dry-run=client -o yaml'`, completion bash.
+3. `kubectl explain <res>.<champ>` pour les champs sans quitter le terminal.
+4. Doc kubernetes.io au **search**, pas aux bookmarks perso (secure browser).
+5. `kubectl config use-context` **avant chaque question** + verrouiller `-n <ns>`. Oubli = 0 point.
+
+**🏗️ Cluster Architecture (25%)**
+6. **etcd backup + restore** (quasi garanti) : `snapshot save/restore --data-dir` + repointer le static pod.
+7. **kubeadm upgrade** (quasi garanti) : `drain` → apply/upgrade node → kubelet+kubectl (apt) → `uncordon`.
+8. **RBAC** : Role/Binding via `kubectl create role/rolebinding`, test `auth can-i --as=`.
+
+**📦 Workloads (15%)**
+9. Rollout : `set image`, `rollout status/undo/history`, `scale --replicas`.
+10. Scheduling : `nodeSelector`, taints/tolerations, affinity ; requests/limits → `FailedScheduling`.
+
+**🌐 Services & Networking (20%)**
+11. Service types + **`kubectl get endpoints`** (réflexe debug selector mismatch).
+12. NetworkPolicy : `podSelector`+`namespaceSelector` items `-` séparés = **OR**, même item = **AND**.
+13. Ingress (host/path, `pathType`, `ingressClassName`) + debug CoreDNS (`busybox nslookup`).
+
+**💾 Storage (10%) & 🔧 Troubleshooting (30%)**
+14. PV/PVC/StorageClass : accessModes, reclaimPolicy, volumeMode ; PVC `Pending` = pas de PV/SC compatible.
+15. Méthode systématique **`describe` → `logs` → `events`** ; node down → `journalctl -u kubelet` ; CP down → `/etc/kubernetes/manifests/` + `crictl`.
+
+> Règle au-dessus de tout : *Understand = create + configure + troubleshoot + delete*, **chrono en main**. Entraînement = [DOMAIN-REVIEW-CHECKLIST.md](../DOMAIN-REVIEW-CHECKLIST.md) puis **killer.sh**.
+
 ## 🧭 Comment lire le curriculum CNCF
 
 > Dans le curriculum, **« Understand X »** ne veut PAS dire « savoir que ça existe ».
