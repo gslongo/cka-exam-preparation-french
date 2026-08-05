@@ -6,9 +6,6 @@
 **Durée exam** : 2 h · **Score** : ≥ 66 % · **Retake gratuit** : 1 · **Valide** : 2 ans · **Version exam** : K8s v1.35.
 
 > ⚠️ **Disclaimer** : notes de révision **personnelles**, non affiliées à la Linux Foundation ni à la CNCF. Elles reformulent des concepts publics Kubernetes ; **aucun contenu de lab LFS158/LFS258 sous copyright n'est reproduit ici** (les PDF du cours sont exclus via `.gitignore`). Vérifie toujours la [doc officielle](https://kubernetes.io/docs/) et le [curriculum CKA](https://github.com/cncf/curriculum) le jour J.
-
-> 👉 **Comment travailler avec l'agent IA** : voir [HOWTO.md](HOWTO.md) (mémo utilisateur).
-> 🎯 **Topics à travailler** : [TOPICS-A-TRAVAILLER.md](TOPICS-A-TRAVAILLER.md) · **Questions probables** : [QUESTIONS-EXAMEN.md](QUESTIONS-EXAMEN.md) · **Pièges classiques** : [PIEGES-EXAMEN.md](PIEGES-EXAMEN.md)
 > ✅ **Entraînement chrono** : [DOMAIN-REVIEW-CHECKLIST.md](DOMAIN-REVIEW-CHECKLIST.md) (50 tâches LFS258 Appendix A)
 > 🏆 **Stratégie & Top 15** : [shared/exam-strategy.md](shared/exam-strategy.md) (méthode, timing, bookmarks, PSI)
 
@@ -49,6 +46,8 @@ CKA/                              ← workspace (ce dossier)
 ## 🧰 Ressources transverses
 
 - [00-cheatsheet.md](00-cheatsheet.md) — condensé imprimable (à relire J-1)
+- [QUESTIONS-EXAMEN.md](QUESTIONS-EXAMEN.md) — questions haute probabilité + solutions
+- [PIEGES-EXAMEN.md](PIEGES-EXAMEN.md) — pièges classiques tous chapitres
 - [shared/exam-strategy.md](shared/exam-strategy.md) — stratégie examen, Top 15, timing, bookmarks, PSI
 - [shared/kubectl-tips.md](shared/kubectl-tips.md) — réflexes kubectl, alias, JSONPath
 - [shared/yaml-snippets.md](shared/yaml-snippets.md) — YAML types prêts à copier
