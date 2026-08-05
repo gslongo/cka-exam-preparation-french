@@ -210,6 +210,26 @@ kubectl describe ct new-cron-object
 
 > ⚠️ **`kubectl delete -f crd.yaml` supprime la CRD ET en cascade tous les CR de ce type** (tous les objets `CronTab`). Destruction massive silencieuse — attention en prod.
 
+### Accès à l'API — pipeline de requête
+
+Toute requête au `kube-apiserver` passe par **3 étapes** (en **TLS**, certs gérés par kubeadm) :
+
+```mermaid
+graph LR
+    C[Client kubectl/SA] -->|TLS| AuthN[1. Authentication<br/>qui es-tu ?]
+    AuthN --> AuthZ[2. Authorization<br/>as-tu le droit ?]
+    AuthZ --> Adm[3. Admission Control<br/>mutating → validating]
+    Adm --> ETCD[(etcd)]
+```
+
+1. **Authentication** — vérifie l'**identité**. Deux types de sujets : **normal users** (humains, gérés **hors** cluster : x509, OIDC, webhook) et **ServiceAccounts** (gérés **dans** K8s, pour les Pods/workloads). Modules essayés en séquence, premier succès gagne. ⚠️ Pas de « user object » natif. ⚠️ *basic auth / static password file* **supprimés en 1.19** — hors exam v1.35.
+2. **Authorization** — vérifie les **droits** : **RBAC** (défaut kubeadm), aussi `Node`, `ABAC`, `Webhook`. Modules en chaîne → premier **allow** gagne, sinon deny.
+3. **Admission Control** — valide/modifie la requête : **mutating** d'abord (peut réécrire, ex. injecter defaults), puis **validating** (accepte/rejette, ex. `PodSecurity`, `ResourceQuota`).
+
+> � **Activer/désactiver un plugin d'admission** : flags `--enable-admission-plugins=` / `--disable-admission-plugins=` du `kube-apiserver`. En kubeadm = static Pod → éditer `/etc/kubernetes/manifests/kube-apiserver.yaml`, l'apiserver **redémarre automatiquement**. Plugins clés : `NamespaceLifecycle`, `LimitRanger`, `ResourceQuota`, `PodSecurity`, `MutatingAdmissionWebhook`, `ValidatingAdmissionWebhook`.
+> Inspecter : `grep admission /etc/kubernetes/manifests/kube-apiserver.yaml`. **`NodeRestriction`** est activé **par défaut par kubeadm** (limite chaque kubelet à modifier seulement son propre Node + ses Pods).
+> �🔑 Ordre à retenir : **AuthN → AuthZ → Admission → etcd**. Un `403 Forbidden` = échec AuthZ (RBAC) ; un `401 Unauthorized` = échec AuthN.
+
 ### RBAC
 
 ```mermaid
@@ -222,6 +242,9 @@ graph LR
 
 - `Role` = namespace-scoped ; `ClusterRole` = cluster-scoped
 - Un `RoleBinding` peut référencer un `ClusterRole` (utile pour donner des perms de type "admin" dans un seul namespace)
+- **RBAC est purement additif** : aucune règle de **deny**. Un sujet est autorisé s'il matche **≥ 1** règle `allow` (union de tous ses bindings) ; sinon refus par défaut. On ne « soustrait » jamais un droit — on ne l'accorde simplement pas.
+- **Identité x509** : dans un cert client, **`CN` (Common Name) = username** et **`O` (Organization) = group** (plusieurs `O` = plusieurs groups). C'est ce que K8s lit pour l'AuthN — il n'y a pas d'objet User. Ex. `-subj "/CN=DevDan/O=development"` → user `DevDan`, groupe `development`.
+- **Deux façons de signer un cert user** : (1) **CSR API** (`CertificateSigningRequest` + `kubectl certificate approve`, cf. Q18) — méthode « native » ; (2) **openssl direct** contre `/etc/kubernetes/pki/ca.{crt,key}` (`openssl x509 -req -CA ... -CAkey ...`) — plus rapide en lab.
 - **Verbs** courants : `get, list, watch, create, update, patch, delete, deletecollection`
 - **ServiceAccount** par défaut : `default` dans chaque namespace, **peu de droits**. Créer un SA dédié par app.
 
@@ -252,6 +275,7 @@ Avant de lancer `kubeadm init`, 5 décisions structurantes (LFS258) :
 
 - **Quorum etcd** = `(N/2) + 1`. Toujours un **nombre impair** de membres (3, 5, 7).
 - Recommandation prod : **5 membres etcd** (tolère 2 pertes).
+- **LB en façade** des apiservers = **L4 / TCP pass-through** (HAProxy/nginx en mode TCP), **pas** L7 avec terminaison TLS — l'apiserver gère lui-même la mTLS. Adresse du LB = `controlPlaneEndpoint`.
 
 ### CRI · CNI · CSI · Device Plugins
 
@@ -389,6 +413,15 @@ networking:
 etcd:
   local:
     dataDir: /var/lib/etcd
+# --- Variante EXTERNAL etcd (non-collocated) : remplace le bloc etcd.local ci-dessus ---
+# etcd:
+#   external:
+#     endpoints:
+#       - https://10.0.0.11:2379
+#       - https://10.0.0.12:2379
+#     caFile:   /etc/kubernetes/pki/etcd/ca.crt
+#     certFile: /etc/kubernetes/pki/apiserver-etcd-client.crt
+#     keyFile:  /etc/kubernetes/pki/apiserver-etcd-client.key
 ---
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
@@ -402,6 +435,7 @@ cgroupDriver: systemd     # doit correspondre au runtime (containerd)
 - **Swap activé** → kubelet refuse de démarrer. `swapoff -a` + retirer de `/etc/fstab` (ou `--fail-swap-on=false`, K8s 1.28+ swap supporté).
 - **`br_netfilter` non chargé** → NetworkPolicy KO. `modprobe br_netfilter` + `sysctl net.bridge.bridge-nf-call-iptables=1`.
 - Oublier `--upload-certs` en init HA → jointure des CP secondaires impossible.
+- **Certificate key expirée (2 h)** : la clé qui chiffre les certs uploadés pour joindre un CP expire après **2 heures**. Au-delà → régénérer : `sudo kubeadm init phase upload-certs --upload-certs` (redonne une nouvelle `--certificate-key` à passer au `kubeadm join --control-plane`).
 
 ### RBAC
 - `RoleBinding` référençant un `ClusterRole` → droits **limités au namespace du RB**.

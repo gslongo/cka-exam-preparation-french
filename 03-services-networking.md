@@ -275,6 +275,7 @@ graph TB
   - `podSelector` : Pods dans le même namespace
   - `namespaceSelector` : namespaces cibles
   - `ipBlock` : CIDR (utile pour egress externe)
+- Les selectors acceptent `matchLabels` **ou** `matchExpressions` (opérateurs `In`/`NotIn`/`Exists`/`DoesNotExist`) — même syntaxe que partout ailleurs.
 
 ## 📋 Commandes essentielles
 

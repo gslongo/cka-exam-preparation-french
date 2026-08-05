@@ -20,6 +20,13 @@ kubectl config use-context <ctx>
 kubectl config set-context --current --namespace=<ns>
 kubectl config view --minify                    # contexte courant seulement
 
+# --- Créer un cert client user (méthode openssl directe, alt. à la CSR API) ---
+openssl genrsa -out dan.key 2048
+openssl req -new -key dan.key -out dan.csr -subj "/CN=DevDan/O=development"  # CN=user, O=group
+sudo openssl x509 -req -in dan.csr \
+  -CA /etc/kubernetes/pki/ca.crt -CAkey /etc/kubernetes/pki/ca.key \
+  -CAcreateserial -out dan.crt -days 45
+
 # --- Construire un kubeconfig utilisateur (après un client cert signé, cf. Q18/CSR) ---
 # ordre : cluster → user → context → use-context
 kubectl config set-cluster kubernetes \
