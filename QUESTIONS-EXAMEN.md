@@ -11,7 +11,7 @@ _Dernière mise à jour : 2026-07-27_
 
 ---
 
-<details>
+<details open>
 <summary>📑 Sommaire</summary>
 
 - [🗂️ Index (du plus probable au moins probable)](#️-index-du-plus-probable-au-moins-probable)

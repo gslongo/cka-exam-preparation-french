@@ -2,7 +2,7 @@
 
 > Concentré de commandes utiles pour économiser du temps à l'exam. **N'apprendre par cœur que la section ⚡**.
 
-<details>
+<details open>
 <summary>📑 Sommaire</summary>
 
 - [⚡ À taper dans les 30 premières secondes](#-à-taper-dans-les-30-premières-secondes)

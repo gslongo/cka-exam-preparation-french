@@ -11,7 +11,7 @@ _Dernière mise à jour : 2026-07-30_
 
 ---
 
-<details>
+<details open>
 <summary>📑 Sommaire</summary>
 
 - [🎯 Domain Review Items (compétences officielles, copiées du curriculum CNCF)](#-domain-review-items-compétences-officielles-copiées-du-curriculum-cncf)

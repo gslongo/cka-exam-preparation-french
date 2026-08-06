@@ -2,7 +2,7 @@
 
 > **CKA — 20 %** · Services, Ingress, DNS, CNI, NetworkPolicy, kube-proxy modes.
 
-<details>
+<details open>
 <summary>📑 Sommaire</summary>
 
 - [🎯 Objectifs de l'exam](#-objectifs-de-lexam)
@@ -132,7 +132,7 @@ kubectl exec <pod> -- curl -s -o /dev/null -w '%{http_code}\n' localhost:80
 kubectl debug -it <pod> --image=nicolaka/netshoot --target=<container> -- ss -ltnp
 ```
 
-> ⚠️ `containerPort`, la spec du Service et la doc sont **déclaratifs** → peuvent diverger du runtime. `ss -ltnp` (ou `kubectl debug --target`) = **seule preuve directe**. Fix : `--target-port` = vrai port d'écoute (cf. piège N9).
+> ⚠️ `containerPort`, la spec du Service et la doc sont **déclaratifs** → peuvent diverger du runtime. `ss -ltnp` (ou `kubectl debug --target`) = **seule preuve directe**. Fix : `--target-port` = vrai port d'écoute (cf. piège [N9](PIEGES-EXAMEN.md)).
 
 ### kube-proxy — modes
 

@@ -2,7 +2,7 @@
 
 > **CKA — 15 %** · Deployments, ReplicaSets, DaemonSets, StatefulSets, Jobs, scheduling, autoscaling.
 
-<details>
+<details open>
 <summary>📑 Sommaire</summary>
 
 - [🎯 Objectifs de l'exam](#-objectifs-de-lexam)
@@ -10,7 +10,7 @@
   - [Le Pod — unité de base](#le-pod--unité-de-base)
   - [Hiérarchie des workloads](#hiérarchie-des-workloads)
   - [ReplicaSet — orphelinage & adoption (label-driven)](#replicaset--orphelinage--adoption-label-driven)
-  - [Rolling update — Deployment](#rolling-update--deployment)
+  - [Rolling update & rollback (Deployment)](#rolling-update--rollback-deployment)
   - [StatefulSet — spécificités](#statefulset--spécificités)
   - [Job / CronJob — spécificités](#job--cronjob--spécificités)
   - [DaemonSet — spécificités](#daemonset--spécificités)
@@ -106,11 +106,25 @@ Le lien **contrôleur ↔ Pod** se fait **par `selector` (labels)**, matérialis
 
 **Options de `--cascade`** : `background` (défaut — supprime le contrôleur, GC supprime les Pods en tâche de fond), `foreground` (supprime les Pods **avant** le contrôleur), `orphan` (garde les Pods).
 
-### Rolling update — Deployment
+### Rolling update & rollback (Deployment)
 
-- `strategy.type` : `RollingUpdate` (défaut) ou `Recreate`
-- `maxUnavailable` (25 %) et `maxSurge` (25 %) contrôlent la vitesse
-- Historique via ReplicaSets successifs → **rollback** en un ordre
+Mettre à jour un `Deployment` (ex. `kubectl set image`) = basculer **progressivement** ses Pods de l'ancien `ReplicaSet` vers un nouveau.
+
+**Deux stratégies** (`spec.strategy.type`) :
+
+| Stratégie | Comportement | Downtime |
+|---|---|---|
+| **`RollingUpdate`** (défaut) | Crée les nouveaux Pods et supprime les anciens **par vagues** ; les 2 versions coexistent le temps du basculement. | ❌ aucun |
+| **`Recreate`** | Supprime **tous** les anciens Pods, **puis** crée les nouveaux. | ⚠️ oui (utile si 2 versions ne peuvent pas tourner ensemble) |
+
+**Deux curseurs qui règlent le rythme du RollingUpdate** (défaut **25 %** chacun ; valeur en % ou en nombre absolu) :
+
+| Champ | Ce qu'il autorise | Réglage |
+|---|---|---|
+| `maxUnavailable` | Nombre de Pods qui peuvent **manquer** sous le compte désiré pendant la MàJ. | `0` = jamais en dessous du désiré (plus sûr, mais plus lent). |
+| `maxSurge` | Nombre de Pods créés **en plus** du désiré, temporairement. | Plus élevé = bascule plus rapide, mais consomme plus de ressources. |
+
+**Historique & rollback** : chaque révision = un `ReplicaSet` **conservé** (l'ancien est mis à `replicas=0`, pas supprimé). D'où le retour arrière en une commande : `kubectl rollout undo deploy/web` (ou `--to-revision=N`, historique via `kubectl rollout history deploy/web`).
 
 ```mermaid
 sequenceDiagram
@@ -157,7 +171,7 @@ sequenceDiagram
 ### DaemonSet — spécificités
 
 - **1 Pod par node** (pas de champ `replicas`) ; ajout/suppression auto quand un node rejoint/quitte
-- Placement via `nodeSelector` / `tolerations` / affinity ; pour tourner sur le control plane → **tolérer** `node-role.kubernetes.io/control-plane:NoSchedule` (cf. piège W3)
+- Placement via `nodeSelector` / `tolerations` / affinity ; pour tourner sur le control plane → **tolérer** `node-role.kubernetes.io/control-plane:NoSchedule` (cf. piège [W3](PIEGES-EXAMEN.md))
 - `updateStrategy` : `RollingUpdate` (défaut) ou `OnDelete`
   - **RollingUpdate** : `maxUnavailable` (défaut **1**) **et** `maxSurge` (défaut **0**, GA depuis 1.25 — attention : Deployment a `maxSurge` **25 %** par défaut, le DS **0**). MàJ automatique, un node à la fois.
   - **OnDelete** : `set image` / `edit` **ne recrée pas** les Pods existants → l'admin doit `kubectl delete pod` chaque Pod pour que le remplaçant démarre avec la nouvelle image.
@@ -171,10 +185,25 @@ sequenceDiagram
 2. **Scoring** (priorities) : note les nodes restants → prend le meilleur.
 3. **Binding** : écrit un objet `Binding` (= `pod.spec.nodeName`) sur l'API server → le **kubelet** du node crée les conteneurs.
 
+```mermaid
+flowchart TD
+    P["Pod créé<br/>(spec.nodeName vide)"] --> W[kube-scheduler le watch]
+    W --> F["1 · Filtering<br/>écarte les nodes infaisables<br/>(ressources, taints, nodeSelector…)"]
+    F --> C{Au moins<br/>1 node faisable ?}
+    C -- Non --> PEND["Pod Pending<br/>event FailedScheduling"]
+    PEND -.retry.-> F
+    C -- Oui --> S["2 · Scoring<br/>note les nodes restants<br/>→ garde le meilleur"]
+    S --> B["3 · Binding<br/>écrit spec.nodeName via l'API"]
+    B --> K["kubelet du node<br/>crée les conteneurs (CRI)"]
+```
+
 - Aucun node faisable → Pod **`Pending`** + event `FailedScheduling` (`kubectl describe pod` / `get events`). Pas d'erreur bloquante, il attend.
 - **`spec.schedulerName`** : utilise un scheduler custom au lieu du `default-scheduler` (multiple schedulers en parallèle).
   - ⚠️ Si le scheduler nommé **n'est pas déployé** → Pod `Pending` **sans event `FailedScheduling`** (aucun scheduler ne watch ce Pod). Diagnostic : vérifier `spec.schedulerName` (≠ Pending classique par manque de ressources, qui lui génère `FailedScheduling`).
 - **Scheduling profiles** (`KubeSchedulerConfiguration`, via `--config`) : active/désactive des plugins de filtering/scoring et ajuste leurs poids, sans scheduler custom. Sur kubeadm le scheduler est un **static Pod** (`/etc/kubernetes/manifests/kube-scheduler.yaml`). Borderline CKA — connaître le terme suffit.
+  - Un plugin se branche sur un **point d'extension** (le cycle du scheduler découpé en slots) : `queueSort` (tri de la file) → `preFilter`/`filter`/`postFilter` (Filtering + préemption) → `preScore`/`score` (Scoring) → `reserve`/`permit`/`preBind`/`bind`/`postBind` (Binding).
+  - **Activés par défaut** (les examinables) : `NodeResourcesFit` (ressources), `NodeAffinity` (`nodeSelector`+affinity), `NodeName`, `NodePorts` (`hostPort`), `TaintToleration`, `PodTopologySpread`, `InterPodAffinity`, `VolumeBinding` (PVC), `NodeUnschedulable` (écarte les `cordon`), `ImageLocality` (favorise l'image déjà présente, score), `DefaultPreemption` (postFilter), `PrioritySort` (queueSort). La plupart agissent en `filter` **et** `score`.
+  - **Ce qu'un profile permet** : `disabled` (couper un plugin défaut, ex. `ImageLocality`) · `enabled` (ajouter/activer un plugin) · ajuster les **poids** de scoring (`pluginConfig`) · choisir la stratégie de `NodeResourcesFit` — `LeastAllocated` (défaut = étale) vs `MostAllocated` (bin-packing) · définir **plusieurs profiles** dans un seul binaire, chacun avec son `schedulerName` (un Pod le choisit via `spec.schedulerName`, sans déployer de 2ᵉ scheduler).
 
 | Mécanisme | Sens | Portée |
 |---|---|---|
@@ -185,20 +214,53 @@ sequenceDiagram
 | `topologySpreadConstraints` | Répartition entre zones/hosts | HA |
 | `priorityClassName` | Ordre de scheduling, préemption | Multi-workload |
 
-**Taints — 3 effets** :
+> 💡 **`topologySpreadConstraints` = successeur de `podAntiAffinity` pour le *spread* (HA) uniquement**, pas un remplacement total :
+> - `podAntiAffinity` est **binaire** (« 0/1 Pod par topologie ») et **coûteux** (O(Pods²), ralentit le scheduler à grande échelle).
+> - `topologySpreadConstraints` exprime un **déséquilibre chiffré** via `maxSkew` (ex. « ~2 Pods/zone, écart ≤ 1 »), avec `whenUnsatisfiable: DoNotSchedule` (hard) ou `ScheduleAnyway` (soft) — plus léger.
+> - Mais `podAffinity`/`podAntiAffinity` restent **irremplaçables** pour **co-localiser** (rapprocher un Pod d'un autre) ou une **exclusion dure Pod↔Pod** (« jamais 2 replicas DB sur le même node »). Le spread ne fait que **répartir**, jamais rapprocher.
+
+**Structure d'un taint** — posé **sur le node**, format `key=value:effect` (la `value` est **optionnelle** → `key:effect` ou `key=:effect` valides) :
+
+```bash
+kubectl taint node n1 gpu=true:NoSchedule    # key=gpu, value=true, effect=NoSchedule
+kubectl taint node n1 gpu:NoSchedule         # value vide (matché par operator: Exists)
+kubectl taint node n1 gpu=true:NoSchedule-   # le "-" final RETIRE le taint
+```
+
+Le **node repousse** le Pod via son taint ; le Pod n'est **admis que s'il porte une `toleration`** correspondante (posée **sur le Pod**). Une toleration matche un taint via 2 opérateurs :
+
+| Champ toleration | Rôle |
+|---|---|
+| `key` | doit correspondre à la `key` du taint (vide + `Exists` = matche **tout** taint) |
+| `operator` | `Equal` (défaut → compare aussi la `value`) · `Exists` (ignore la `value`, matche la seule présence de la clé) |
+| `value` | comparée **uniquement** si `operator: Equal` |
+| `effect` | l'effet toléré (vide = tolère **tous** les effets de cette clé) |
+
+```yaml
+tolerations:
+- key: gpu
+  operator: Equal        # matche si key=gpu ET value=true
+  value: "true"
+  effect: NoSchedule
+```
+
+> 🔑 **Taint (node) et toleration (Pod) sont les 2 moitiés d'un même mécanisme** : le taint *repousse*, la toleration *autorise*. Une toleration ne **force** jamais le placement (contrairement à l'affinity) — elle **lève seulement** le blocage. Un Pod tolérant peut donc atterrir ailleurs.
+
+**Taints — 3 effets** (le champ `effect`) :
 - `NoSchedule` : refuse nouveaux Pods
 - `PreferNoSchedule` : évite si possible
 - `NoExecute` : évince les Pods existants
-
-- **`tolerationSeconds`** (seulement avec `NoExecute`) : le Pod toléré reste N secondes avant éviction (sans = immédiat).
+  - **`tolerationSeconds`** (seulement avec `NoExecute`) : le Pod toléré reste N secondes avant éviction (sans = immédiat).
 - **Taint-based evictions** : le node-controller pose auto des taints `NoExecute` sur node malade (`node.kubernetes.io/not-ready`, `unreachable`, `disk-pressure`…) ; K8s injecte une toleration **300 s** par défaut → délai avant reschedule quand un node tombe. ⚠️ Ces évictions **ne respectent pas les PodDisruptionBudgets** (contrairement à `drain`).
 
 Exemple : les control plane ont par défaut `node-role.kubernetes.io/control-plane:NoSchedule`.
 
-**Affinity — `required` vs `preferred`** :
+**Affinity (node / pod) — `required` vs `preferred`** — ces 2 modes sont des sous-champs de `spec.affinity` (`nodeAffinity`, `podAffinity`, `podAntiAffinity`), **pas** des tolerations (une toleration se contente de matcher ou non un taint, sans mode hard/soft) :
 - `requiredDuringSchedulingIgnoredDuringExecution` = **hard** : obligatoire au scheduling, sinon Pod **`Pending`** (garantie).
 - `preferredDuringSchedulingIgnoredDuringExecution` = **soft** : simple préférence (scoring), planifie ailleurs si besoin.
 - `IgnoredDuringExecution` = évalué **au scheduling seulement** → changer les labels du node **après** ne réévince pas le Pod.
+
+> ⚠️ Ne pas confondre : l'**affinity attire/repousse activement** (le Pod *choisit* et peut **forcer** son node via `required`) ; la **toleration** ne fait que *lever* un blocage de taint (elle n'attire ni ne force jamais un placement).
 
 > 💡 Question piège : un Pod sans `tolerations` peut être planifié sur un node **cordoned** ? **Non** — `cordon` = `unschedulable=true`, complètement différent des taints.
 
@@ -206,17 +268,25 @@ Exemple : les control plane ont par défaut `node-role.kubernetes.io/control-pla
 
 ### Requests, limits, QoS
 
+`requests`/`limits` se **déclarent par conteneur** (`spec.containers[].resources`), mais agissent à des niveaux différents :
+
+| Notion | Où on l'écrit | À quel niveau ça agit |
+|---|---|---|
+| `requests` | conteneur | **scheduling** : le scheduler **somme** les requests des conteneurs → choisit un node (réservation). |
+| `limits` | conteneur | **runtime, par conteneur** : CPU throttle · mémoire dépassée → **OOMKill de ce conteneur**. |
+| **classe QoS** | dérivée (non écrite) | **Pod entier** : étiquette calculée auto → **ordre d'éviction** sous pression mémoire du node. |
+
 - `requests` = garantie de réservation (scheduling)
 - `limits` = plafond (CPU throttle, mémoire → OOMKill)
-- **Classes QoS** dérivées automatiquement :
+- **Classes QoS (Quality of Service)** = une **étiquette que K8s colle à chaque Pod**, déduite de la façon dont ses conteneurs déclarent `requests`/`limits`. Tu ne l'écris pas : elle est **calculée automatiquement** et lisible dans `status.qosClass`. Elle sert **une seule chose** — décider **quels Pods sont tués en premier** quand un node manque de mémoire (`MemoryPressure`).
 
-| Classe | Condition |
+| Classe | Condition (comment on l'obtient) |
 |---|---|
-| `Guaranteed` | `requests == limits` pour **tous** les containers CPU & mem |
-| `Burstable` | requests < limits (au moins un) |
-| `BestEffort` | aucune requests ni limits |
+| `Guaranteed` | `requests == limits` **définis** pour **tous** les conteneurs, en CPU **et** mémoire (le plus protégé) |
+| `Burstable` | au moins un conteneur a des `requests` < `limits` (ou requests sans limits) |
+| `BestEffort` | **aucun** conteneur ne déclare ni `requests` ni `limits` (le plus sacrifiable) |
 
-Priorité d'éviction : `BestEffort` > `Burstable` > `Guaranteed`.
+**Priorité d'éviction** (qui meurt d'abord sous pression mémoire) : `BestEffort` > `Burstable` > `Guaranteed`.
 
 > 💡 **Unités (case-sensitive !)** :
 > - **CPU** : `1` = 1 cœur ; `500m` = 0,5 cœur (m = **milli**cpu). `0.5` == `500m`.
@@ -236,7 +306,8 @@ Contrôle **qui/comment** tourne le process. Niveau **Pod** (`spec.securityConte
 | `readOnlyRootFilesystem: true` | FS racine en lecture seule |
 | `capabilities` | `add`/`drop` de capabilities Linux (ex. `drop: ["ALL"]`) |
 
-> 💡 Piège type (Domain Review #34) : un Pod crashe car nginx ne peut pas lire sa conf → `runAsUser: <uid nginx>`. `runAsNonRoot: true` **sans** `runAsUser` sur une image root = refus de démarrage.
+> 💡 Piège type ([Domain Review #34](DOMAIN-REVIEW-CHECKLIST.md)) : un Pod crashe car nginx ne peut pas lire sa conf → `runAsUser: <uid nginx>`. `runAsNonRoot: true` **sans** `runAsUser` sur une image root = refus de démarrage.
+
 ### ResourceQuota & LimitRange (par namespace)
 
 | Objet | Portée | Rôle |
@@ -258,21 +329,24 @@ spec:
     persistentvolumeclaims: "5"
 ```
 
-> ⚠️ **Piège** : si un `ResourceQuota` fixe `requests.cpu`/`limits.memory` sur le namespace, **tout** Pod créé **doit** déclarer les requests/limits correspondantes, sinon il est **refusé** (`forbidden: failed quota`). C'est là que `LimitRange` (valeurs par défaut) devient utile.
+> ⚠️ **Piège** : si un `ResourceQuota` fixe `requests.cpu`/`limits.memory` sur le namespace, **tout** Pod créé **doit** déclarer les requests/limits correspondantes, sinon il est **refusé** (`forbidden: failed quota`). C'est là que `LimitRange` (valeurs par défaut) devient utile. (cf. piège [W9](PIEGES-EXAMEN.md))
 > 💡 `scopeSelector` : un quota peut ne s'appliquer qu'à certains Pods (ex: un `priorityClassName` donné) → politiques différenciées par priorité.
 > Vérifier : `kubectl describe quota -n <ns>` (montre `Used / Hard`).
 
 #### LimitRange — notes pratiques
 
-Un `LimitRange` agit **par conteneur (ou par Pod/PVC)** au moment de l'admission. 4 leviers :
+Un `LimitRange` agit **par conteneur (ou par Pod/PVC)** au moment de l'admission. 5 leviers, **tous optionnels** :
 
-| Champ | Effet |
-|---|---|
-| `defaultRequest` | `requests` **injectées** si le conteneur n'en déclare pas |
-| `default` | `limits` **injectées** si le conteneur n'en déclare pas |
-| `min` | valeur **plancher** — un conteneur qui demande moins est **refusé** |
-| `max` | valeur **plafond** — un conteneur qui demande plus est **refusé** |
-| `maxLimitRequestRatio` | borne le ratio `limits/requests` (empêche un overcommit trop agressif) |
+| Champ | Effet | Obligatoire ? (défaut) |
+|---|---|---|
+| `type` | cible de l'entrée : `Container` · `Pod` · `PersistentVolumeClaim` | ✅ **seul champ requis** de l'entrée |
+| `defaultRequest` | `requests` **injectées** si le conteneur n'en déclare pas | ❌ optionnel — si absent mais `default` posé → **prend la valeur de `default`** |
+| `default` | `limits` **injectées** si le conteneur n'en déclare pas | ❌ optionnel — rien d'injecté si absent (`Container` uniquement) |
+| `min` | valeur **plancher** — un conteneur qui demande moins est **refusé** | ❌ optionnel |
+| `max` | valeur **plafond** — un conteneur qui demande plus est **refusé** | ❌ optionnel |
+| `maxLimitRequestRatio` | borne le ratio `limits/requests` (empêche un overcommit trop agressif) | ❌ optionnel |
+
+> 💡 Aucune contrainte n'est obligatoire : un `LimitRange` avec juste `max` est valide. Seul `type` l'est. `default`/`defaultRequest` n'agissent que sur `type: Container` (pas d'injection de défauts pour `Pod`/`PVC`). Cohérence exigée : `min ≤ defaultRequest ≤ default ≤ max`.
 
 ```yaml
 apiVersion: v1
@@ -296,7 +370,23 @@ Notes pour tes projets :
 - **Ordre d'application** : le LimitRange injecte d'abord les defaults, **puis** le ResourceQuota valide le cumul. Les deux ensemble = un namespace « discipliné » sans avoir à écrire les resources dans chaque manifest.
 - Pas de `kubectl create limitrange` → **YAML obligatoire** (`kubectl apply -f`).
 - `type: Pod` borne la **somme** des conteneurs du Pod ; `type: Container` borne **chaque** conteneur.
-- Vérifier : `kubectl describe limitrange -n <ns>`.
+
+**Voir / mettre à jour** (pas de commande impérative → tout via l'API objet) :
+
+```bash
+# --- Voir ---
+kubectl get limitrange -n dev
+kubectl describe limitrange defaults -n dev    # ⭐ tableau Min/Max/Default/DefaultRequest/Ratio par ressource
+kubectl get limitrange defaults -n dev -o yaml # manifest complet
+
+# --- Mettre à jour (3 voies) ---
+kubectl apply -f limitrange.yaml               # ré-appliquer le YAML (idempotent, GitOps)
+kubectl edit limitrange defaults -n dev        # édition à chaud ($EDITOR sur l'objet live)
+kubectl patch limitrange defaults -n dev --type merge \
+  -p '{"spec":{"limits":[{"type":"Container","default":{"cpu":"1"}}]}}'   # patch ciblé
+```
+
+> ⚠️ Modifier un `LimitRange` **ne retouche pas** les Pods déjà créés — les nouvelles valeurs ne valent que pour les **créations/updates suivants**. Pour rattraper l'existant → `kubectl rollout restart` (recrée les Pods). Idem `ResourceQuota` : `kubectl get/describe/edit quota -n dev` (le `describe` montre `Used / Hard`).
 
 #### PriorityClass + scopeSelector (culture)
 
@@ -342,7 +432,10 @@ Notes :
 - Requiert **metrics-server** (métriques CPU/mém via `metrics.k8s.io`) ou un adapter (Prometheus) pour custom/external
 - ⭐ **Même source que `kubectl top`** : si `kubectl top pods` marche, le HPA a ses métriques. Sinon → colonne `TARGETS` affiche `<unknown>` et **aucun scaling**
 - ⭐ **% calculé sur les `requests`, jamais les `limits`** : `TARGETS = usage / requests.cpu`. Ex. `requests.cpu=5m` + usage `10m` → **200 %**
-- ⚠️ **Pas de `requests.cpu` sur le conteneur → HPA affiche `<unknown>`** (même symptôme que metrics-server absent, cause différente) → toujours définir un CPU request sur la cible d'un HPA
+- ⚠️ **`<unknown>` a 2 causes distinctes, même affichage** :
+  - **metrics-server absent** → pas d'**usage** (le numérateur manque) ; `kubectl top pods` échoue aussi.
+  - **pas de `requests.cpu` sur le conteneur** → pas de **base de calcul** (le dénominateur manque, car `%  = usage / requests.cpu`) ; `kubectl top pods` **marche** pourtant.
+  - → réflexe diagnostic : si `top` fonctionne mais le HPA reste `<unknown>`, c'est le `requests.cpu` qui manque. Toujours définir un CPU request sur la cible d'un HPA `Utilization`.
 - Poll du controller **toutes les 15 s** (`--horizontal-pod-autoscaler-sync-period`)
 - **Scale-up immédiat**, **scale-down temporisé 300 s** (`--horizontal-pod-autoscaler-downscale-stabilization`, défaut 5 min) → évite le *flapping*
 - Ne fonctionne **pas** avec `replicas` figées si `Deployment.spec.replicas` est défini par un contrôleur externe (GitOps)
@@ -393,7 +486,7 @@ configMapGenerator:            # génère un ConfigMap + hash suffix (rollout au
 - **2 types de patch** : *strategic merge* (fusionne un fragment YAML) ou *JSON patch* (`op: replace/add/remove` sur un chemin).
 - `kubectl kustomize <dir>` = **rend** le YAML final (dry-run, rien d'appliqué) ; `kubectl apply -k <dir>` = **applique**.
 - `configMapGenerator`/`secretGenerator` ajoutent un **hash** au nom → tout changement force un **rolling update** du Deployment qui les monte.
-- ⚠️ **`commonLabels` (ancien) force le label dans le `selector`** (immuable → `apply -k` peut casser un Deployment existant). Nouvelle forme `labels:` → `includeSelectors: false` par défaut = plus sûr.
+- ⚠️ **`commonLabels` (ancien) injecte le label dans le `selector` du Deployment** — or `spec.selector` est **immuable** après création. Donc `apply -k` sur un Deployment **déjà déployé** échoue (`field is immutable`). La forme moderne `labels:` corrige ça : `includeSelectors: false` **par défaut** → le label va sur `metadata` + template **mais pas** dans le selector, donc sûr même sur ressource existante (détails + rendu comparé plus bas).
 - ⚙️ *Exam CKA = niveau basique* : comprendre base/overlay, `-k`, `kubectl kustomize`, override image/replicas. Les generators + hash = bonus compréhension.
 
 **Exemple concret — ce que `includeSelectors` change au rendu.**

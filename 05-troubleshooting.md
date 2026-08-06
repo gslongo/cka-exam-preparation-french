@@ -2,7 +2,7 @@
 
 > **CKA — 30 %** · Le domaine à **maîtriser en priorité absolue**. Beaucoup de questions "réparer un cluster/Pod cassé".
 
-<details>
+<details open>
 <summary>📑 Sommaire</summary>
 
 - [🎯 Objectifs de l'exam](#-objectifs-de-lexam)

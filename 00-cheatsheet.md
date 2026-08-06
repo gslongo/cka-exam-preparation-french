@@ -2,7 +2,7 @@
 
 > Condensé imprimable (A4). À réviser J-7 puis J-1. **Anglais conservé** pour les termes techniques.
 
-<details>
+<details open>
 <summary>📑 Sommaire</summary>
 
 - [⚡ Setup initial (à taper en 30 s à l'exam)](#-setup-initial-à-taper-en-30-s-à-lexam)

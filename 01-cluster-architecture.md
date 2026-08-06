@@ -2,7 +2,7 @@
 
 > **CKA — 25 %** · Domaine le plus large. Inclut RBAC, kubeadm, HA, CRI, extensions.
 
-<details>
+<details open>
 <summary>📑 Sommaire</summary>
 
 - [🎯 Objectifs de l'exam](#-objectifs-de-lexam)
@@ -278,6 +278,7 @@ rules:
 | `"apiextensions.k8s.io"` | `apiextensions.k8s.io/v1` | `customresourcedefinitions` |
 
 > 🔑 **Trouver le triplet** : `kubectl api-resources` donne les colonnes **APIVERSION** (→ apiGroup) · **NAME** (→ resource, au **pluriel**) · **VERBS**. Ex. `kubectl api-resources --api-group=apps -o wide`. Toujours le **pluriel** dans `resources` (`pods`, pas `Pod`).
+> - **Lister les apiGroups** : `kubectl api-versions` (tous les `group/version` servis ; le core = juste `v1`). Groupes distincts seuls : `kubectl api-versions | sed 's|/.*||' | sort -u`.
 > - **Sous-ressources** avec `/` : `pods/log`, `pods/exec`, `pods/portforward`, `deployments/scale`, `<cr>/status`. Le droit sur `pods` ne couvre **pas** `pods/log` → il faut l'ajouter explicitement.
 > - `resources: ["*"]` / `apiGroups: ["*"]` / `verbs: ["*"]` = wildcard (large — à éviter hors cluster-admin).
 

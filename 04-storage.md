@@ -2,7 +2,7 @@
 
 > **CKA — 10 %** · Le domaine le plus léger en poids mais présent presque tout le temps à l'exam.
 
-<details>
+<details open>
 <summary>📑 Sommaire</summary>
 
 - [🎯 Objectifs de l'exam](#-objectifs-de-lexam)

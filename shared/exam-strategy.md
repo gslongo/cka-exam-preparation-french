@@ -5,7 +5,7 @@
 > ⚠️ La dernière stable upstream (ex : 1.36) n'est PAS forcément la version exam. Toujours revérifier la date d'exam approchant : docs.linuxfoundation.org/tc-docs/certification/faq-cka-ckad
 > Format : 2 h · 15-20 tâches pratiques · **passage 66 %** · 1 retake gratuit · killer.sh (2 sessions 36 h).
 
-<details>
+<details open>
 <summary>📑 Sommaire</summary>
 
 - [🏆 Top 15 à savoir absolument](#-top-15-à-savoir-absolument)
@@ -90,12 +90,12 @@ pour couvrir chaque item ; **killer.sh** reste la référence de difficulté.
 
 ### J-7 à J-1
 - **killer.sh session 2** en conditions
-- Imprimer `00-cheatsheet.md` et le relire
+- Imprimer [00-cheatsheet.md](../00-cheatsheet.md) et le relire
 - Préparer les bookmarks navigateur (voir plus bas)
 - Vérifier setup PSI : caméra, ID, pièce dégagée
 
 ### J-1
-- **Ne pas coder**. Relire cheatsheet + fiche `05-troubleshooting`.
+- **Ne pas coder**. Relire cheatsheet + fiche [05-troubleshooting](../05-troubleshooting.md).
 - Vérifier email PSI, timezone, heure exacte
 - Se coucher tôt
 

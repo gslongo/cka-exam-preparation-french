@@ -2,7 +2,7 @@
 
 > Manifests minimaux, indentation 2 espaces, forme compacte quand possible. Objectif = **gain de temps**, pas complétude.
 
-<details>
+<details open>
 <summary>📑 Sommaire</summary>
 
 - [Pod](#pod)

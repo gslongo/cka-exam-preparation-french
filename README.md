@@ -72,12 +72,12 @@ CKA/                              ← workspace (ce dossier)
 
 | Semaine | Focus | Livrables |
 |---|---|---|
-| S1-S2 | LFS158 (bases) + fiche `01` | Concepts consolidés, cluster kubeadm monté |
-| S3-S4 | LFS258 chap. workloads + `02` | Deployments, DaemonSets, scheduling |
-| S5 | Networking (`03`) + CNI hands-on | Ingress, NetworkPolicy testés |
-| S6 | Storage (`04`) + CSI | PVC static + dynamic |
-| S7 | Troubleshooting (`05`) | Logs, events, `crictl`, etcd backup/restore |
-| S8 | killer.sh + `00-cheatsheet.md` | Mock exam ×2, timing < 2 h |
+| S1-S2 | LFS158 (bases) + fiche [01](01-cluster-architecture.md) | Concepts consolidés, cluster kubeadm monté |
+| S3-S4 | LFS258 chap. workloads + [02](02-workloads-scheduling.md) | Deployments, DaemonSets, scheduling |
+| S5 | Networking ([03](03-services-networking.md)) + CNI hands-on | Ingress, NetworkPolicy testés |
+| S6 | Storage ([04](04-storage.md)) + CSI | PVC static + dynamic |
+| S7 | Troubleshooting ([05](05-troubleshooting.md)) | Logs, events, `crictl`, etcd backup/restore |
+| S8 | killer.sh + [00-cheatsheet.md](00-cheatsheet.md) | Mock exam ×2, timing < 2 h |
 
 ## 🔗 Ressources autorisées jour J
 

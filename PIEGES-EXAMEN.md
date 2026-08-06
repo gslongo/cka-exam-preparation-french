@@ -8,7 +8,7 @@ _Dernière mise à jour : 2026-07-31_
 
 ---
 
-<details>
+<details open>
 <summary>📑 Sommaire</summary>
 
 - [🎯 Méta / gestion de l'examen (les plus coûteux)](#-méta--gestion-de-lexamen-les-plus-coûteux)
