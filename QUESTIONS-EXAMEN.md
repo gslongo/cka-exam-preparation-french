@@ -11,6 +11,32 @@ _Dernière mise à jour : 2026-07-27_
 
 ---
 
+<details>
+<summary>📑 Sommaire</summary>
+
+- [🗂️ Index (du plus probable au moins probable)](#️-index-du-plus-probable-au-moins-probable)
+- [Q1 · etcd — snapshot save + restore ⭐⭐⭐](#q1--etcd--snapshot-save--restore-)
+- [Q2 · Upgrade kubeadm ⭐⭐⭐](#q2--upgrade-kubeadm-)
+- [Q3 · Réparer un static Pod cassé ⭐⭐⭐](#q3--réparer-un-static-pod-cassé-)
+- [Q4 · Node NotReady — diagnostic ⭐⭐⭐](#q4--node-notready--diagnostic-)
+- [Q5 · Pod Pending — diagnostiquer le scheduling ⭐⭐⭐](#q5--pod-pending--diagnostiquer-le-scheduling-)
+- [Q6 · NetworkPolicy ⭐⭐⭐](#q6--networkpolicy-)
+- [Q7 · Scheduling — taint + toleration + nodeSelector ⭐⭐⭐](#q7--scheduling--taint--toleration--nodeselector-)
+- [Q8 · RBAC — Role + RoleBinding + SA ⭐⭐](#q8--rbac--role--rolebinding--sa-)
+- [Q9 · Exposer un Deployment ⭐⭐](#q9--exposer-un-deployment-)
+- [Q10 · Rolling update + rollback ⭐⭐](#q10--rolling-update--rollback-)
+- [Q11 · ConfigMap / Secret → env & volume ⭐⭐](#q11--configmap--secret--env--volume-)
+- [Q12 · Sidecar / Pod multi-conteneurs ⭐⭐](#q12--sidecar--pod-multi-conteneurs-)
+- [Q13 · DaemonSet ⭐⭐](#q13--daemonset-)
+- [Q14 · PVC + Pod qui le monte ⭐⭐](#q14--pvc--pod-qui-le-monte-)
+- [Q15 · PV + StorageClass + PVC ⭐⭐](#q15--pv--storageclass--pvc-)
+- [Q16 · Ingress ⭐⭐](#q16--ingress-)
+- [Q17 · DNS / connectivité Service — debug ⭐⭐](#q17--dns--connectivité-service--debug-)
+- [Q18 · Approuver un CertificateSigningRequest ⭐⭐](#q18--approuver-un-certificatesigningrequest-)
+- [Q19 · Grow the cluster — `kubeadm join` (token expiré) ⭐⭐](#q19--grow-the-cluster--kubeadm-join-token-expiré-)
+
+</details>
+
 ## 🗂️ Index (du plus probable au moins probable)
 
 | # | Question | Domaine | Fréquence |

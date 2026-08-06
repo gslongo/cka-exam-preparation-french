@@ -2,6 +2,22 @@
 
 > Condensé imprimable (A4). À réviser J-7 puis J-1. **Anglais conservé** pour les termes techniques.
 
+<details>
+<summary>📑 Sommaire</summary>
+
+- [⚡ Setup initial (à taper en 30 s à l'exam)](#-setup-initial-à-taper-en-30-s-à-lexam)
+- [🔑 kubeconfig post-init (à copier de l'output kubeadm)](#-kubeconfig-post-init-à-copier-de-loutput-kubeadm)
+- [🧭 Commande → effet (référence)](#-commande--effet-référence)
+- [🧯 Problème → 1re commande à taper](#-problème--1re-commande-à-taper)
+  - [🚑 crictl — debug quand `kubectl` ne répond plus](#-crictl--debug-quand-kubectl-ne-répond-plus)
+- [📄 YAML minimaux](#-yaml-minimaux)
+- [🧩 apiVersion par kind (référence rapide)](#-apiversion-par-kind-référence-rapide)
+- [🔐 etcd — backup & restore (procédure figée)](#-etcd--backup--restore-procédure-figée)
+- [⬆️ Upgrade kubeadm — procédure figée](#️-upgrade-kubeadm--procédure-figée)
+- [🎯 Timing exam](#-timing-exam)
+
+</details>
+
 ## ⚡ Setup initial (à taper en 30 s à l'exam)
 
 ```bash

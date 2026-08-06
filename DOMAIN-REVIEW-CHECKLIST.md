@@ -11,6 +11,22 @@ _Dernière mise à jour : 2026-07-30_
 
 ---
 
+<details>
+<summary>📑 Sommaire</summary>
+
+- [🎯 Domain Review Items (compétences officielles, copiées du curriculum CNCF)](#-domain-review-items-compétences-officielles-copiées-du-curriculum-cncf)
+- [🏋️ Exercise A.3 — 50 tâches (checklist chrono)](#️-exercise-a3--50-tâches-checklist-chrono)
+  - [Bloc 1 · Pods, deployments, troubleshooting YAML (1-13)](#bloc-1--pods-deployments-troubleshooting-yaml-1-13)
+  - [Bloc 2 · Secrets, rollout, storage NFS (14-24)](#bloc-2--secrets-rollout-storage-nfs-14-24)
+  - [Bloc 3 · Services & NetworkPolicy (25-29)](#bloc-3--services--networkpolicy-25-29)
+  - [Bloc 4 · securityContext & troubleshooting (30-34)](#bloc-4--securitycontext--troubleshooting-30-34)
+  - [Bloc 5 · RBAC + ServiceAccount + token (35-39)](#bloc-5--rbac--serviceaccount--token-35-39)
+  - [Bloc 6 · Services types, CoreDNS, Ingress (40-47)](#bloc-6--services-types-coredns-ingress-40-47)
+  - [Bloc 7 · etcd + upgrade + scheduler (48-50)](#bloc-7--etcd--upgrade--scheduler-48-50)
+- [🔗 Recoupements avec les fiches](#-recoupements-avec-les-fiches)
+
+</details>
+
 ## 🎯 Domain Review Items (compétences officielles, copiées du curriculum CNCF)
 
 > LFS258 recopie ici les domaines du PDF officiel. À croiser avec le curriculum CKA v1.35 réel (poids : Cluster Arch 25 %, Workloads 15 %, Services & Net 20 %, Storage 10 %, Troubleshooting 30 %).

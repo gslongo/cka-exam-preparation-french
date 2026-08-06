@@ -8,6 +8,22 @@ _Dernière mise à jour : 2026-07-31_
 
 ---
 
+<details>
+<summary>📑 Sommaire</summary>
+
+- [🎯 Méta / gestion de l'examen (les plus coûteux)](#-méta--gestion-de-lexamen-les-plus-coûteux)
+- [🏗️ Cluster Architecture / Install (domaine 01 — 25 %)](#️-cluster-architecture--install-domaine-01--25-)
+- [🔐 APIs & Access / Security (domaine 01)](#-apis--access--security-domaine-01)
+- [📦 Workloads & Scheduling (domaine 02 — 15 %)](#-workloads--scheduling-domaine-02--15-)
+- [🌐 Services & Networking (domaine 03 — 20 %)](#-services--networking-domaine-03--20-)
+- [💾 Storage (domaine 04 — 10 %)](#-storage-domaine-04--10-)
+- [🧯 Troubleshooting (domaine 05 — 30 %, le plus gros !)](#-troubleshooting-domaine-05--30--le-plus-gros-)
+- [🔒 Champs mutables vs immuables (`field is immutable`)](#-champs-mutables-vs-immuables-field-is-immutable)
+- [🩹 Erreurs de syntaxe / réflexes qui coûtent des secondes](#-erreurs-de-syntaxe--réflexes-qui-coûtent-des-secondes)
+- [📚 Sources des retours communautaires](#-sources-des-retours-communautaires)
+
+</details>
+
 ## 🎯 Méta / gestion de l'examen (les plus coûteux)
 
 | # | Piège | Le réflexe qui sauve |
@@ -159,7 +175,7 @@ _Dernière mise à jour : 2026-07-31_
 | Job | `spec.template`, `spec.selector`, `completions` | delete/recreate |
 | ConfigMap / Secret | rien **sauf** `immutable: true` posé volontairement | delete/recreate ; `immutable: true` = choix **perf** (kubelet arrête de watcher) |
 
-> ⚠️ Piège Kustomize lié : `commonLabels` / `labels` avec `includeSelectors: true` injectent le label **dans le selector** → `apply -k` casse un Deployment déjà déployé (selector immuable). Cf. fiche 02 §Kustomize.
+> ⚠️ Piège Kustomize lié : `commonLabels` / `labels` avec `includeSelectors: true` injectent le label **dans le selector** → `apply -k` casse un Deployment déjà déployé (selector immuable). Cf. [fiche 02](02-workloads-scheduling.md) §Kustomize.
 > ⚠️ Nuance Service : le `selector` d'un **Service** EST mutable ; celui d'un **Deployment/RS** ne l'est pas. Ne pas confondre.
 > 🆕 **1.35** : `PersistentVolume.spec.nodeAffinity` est passé **mutable** (KEP #134339). Concerne surtout les PV `local` (affinité node). Faible valeur examinable mais version-spécifique CKA 1.35.
 

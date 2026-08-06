@@ -2,6 +2,13 @@
 
 > Termes techniques essentiels. **Anglais conservé** pour les noms d'objets et concepts standards.
 
+<details>
+<summary>📑 Sommaire</summary>
+
+[A](#a) · [B](#b) · [C](#c) · [D](#d) · [E](#e) · [F](#f) · [G](#g) · [H](#h) · [I](#i) · [J](#j) · [K](#k) · [L](#l) · [M](#m) · [N](#n) · [O](#o) · [P](#p) · [Q](#q) · [R](#r) · [S](#s) · [T](#t) · [U](#u) · [V](#v) · [W](#w) · [Sigles à connaître](#sigles-à-connaître)
+
+</details>
+
 ## A
 
 - **Admission Controller** : plugin API server qui valide/modifie une requête après authn/authz. Ex : `NamespaceLifecycle`, `LimitRanger`, `PodSecurity`, `ValidatingAdmissionWebhook`.

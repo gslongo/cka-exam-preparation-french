@@ -87,18 +87,6 @@ CKA/                              ← workspace (ce dossier)
 
 > ⚠️ Aucune autre URL. Bookmarks à préparer dans [shared/exam-strategy.md](shared/exam-strategy.md).
 
-## 🚦 Statut par domaine
-
-| Domaine | Concepts | Commandes | YAML | Pièges | Docs |
-|---|---|---|---|---|---|
-| 01 Cluster Architecture | 🟡 | 🟡 | 🟡 | 🟡 | 🟡 |
-| 02 Workloads & Scheduling | 🟡 | 🟡 | 🟡 | 🟡 | 🟡 |
-| 03 Services & Networking | 🟡 | 🟡 | 🟡 | 🟡 | 🟡 |
-| 04 Storage | 🟡 | 🟡 | 🟡 | 🟡 | 🟡 |
-| 05 Troubleshooting | 🟡 | 🟡 | 🟡 | 🟡 | 🟡 |
-
-Légende : 🟢 complet · 🟡 en cours · 🔴 vide
-
 ---
 
 ## 📄 Licence & attribution

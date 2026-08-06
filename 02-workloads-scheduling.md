@@ -2,6 +2,36 @@
 
 > **CKA — 15 %** · Deployments, ReplicaSets, DaemonSets, StatefulSets, Jobs, scheduling, autoscaling.
 
+<details>
+<summary>📑 Sommaire</summary>
+
+- [🎯 Objectifs de l'exam](#-objectifs-de-lexam)
+- [🧠 Concepts clés](#-concepts-clés)
+  - [Le Pod — unité de base](#le-pod--unité-de-base)
+  - [Hiérarchie des workloads](#hiérarchie-des-workloads)
+  - [ReplicaSet — orphelinage & adoption (label-driven)](#replicaset--orphelinage--adoption-label-driven)
+  - [Rolling update — Deployment](#rolling-update--deployment)
+  - [StatefulSet — spécificités](#statefulset--spécificités)
+  - [Job / CronJob — spécificités](#job--cronjob--spécificités)
+  - [DaemonSet — spécificités](#daemonset--spécificités)
+  - [Scheduling](#scheduling)
+  - [Requests, limits, QoS](#requests-limits-qos)
+  - [securityContext (Pod & container)](#securitycontext-pod--container)
+  - [ResourceQuota & LimitRange (par namespace)](#resourcequota--limitrange-par-namespace)
+  - [HPA (Horizontal Pod Autoscaler)](#hpa-horizontal-pod-autoscaler)
+  - [Manifest management](#manifest-management)
+- [📋 Commandes essentielles](#-commandes-essentielles)
+- [📄 YAML de référence](#-yaml-de-référence)
+- [⚠️ Pièges fréquents](#️-pièges-fréquents)
+  - [Deployments](#deployments)
+  - [StatefulSet](#statefulset)
+  - [DaemonSet](#daemonset)
+  - [Scheduling](#scheduling-1)
+  - [Resources](#resources)
+- [🔗 Docs officielles autorisées](#-docs-officielles-autorisées)
+
+</details>
+
 ## 🎯 Objectifs de l'exam
 
 - Comprendre les primitives de déploiement (rolling updates, rollbacks)
@@ -19,7 +49,7 @@
 - Design par défaut : **1 conteneur applicatif par Pod** (one-process-per-container).
 - Les conteneurs d'un Pod **démarrent en parallèle** → **aucun ordre garanti**. Pour forcer une séquence (setup, migration…) → **`initContainers`** (s'exécutent l'un après l'autre, jusqu'au succès, **avant** les conteneurs principaux).
 - **Patterns multi-conteneurs** (sidecar / ambassador / adapter) = des **rôles** de conception, **pas** des champs K8s :
-  - **sidecar** : conteneur secondaire d'appui (log shipper, proxy) — cf. Q12.
+  - **sidecar** : conteneur secondaire d'appui (log shipper, proxy) — cf. [Q12](QUESTIONS-EXAMEN.md).
   - **ambassador** : proxy vers un service externe.
   - **adapter** : normalise la sortie de l'app (ex: format de métriques).
 

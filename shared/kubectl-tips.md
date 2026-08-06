@@ -2,6 +2,25 @@
 
 > Concentré de commandes utiles pour économiser du temps à l'exam. **N'apprendre par cœur que la section ⚡**.
 
+<details>
+<summary>📑 Sommaire</summary>
+
+- [⚡ À taper dans les 30 premières secondes](#-à-taper-dans-les-30-premières-secondes)
+- [🗂️ Contexte & namespace](#️-contexte--namespace)
+- [🚀 Génération rapide de manifests (`$do`)](#-génération-rapide-de-manifests-do)
+- [🔎 `kubectl explain`](#-kubectl-explain)
+- [🎯 Sélecteurs & filtres](#-sélecteurs--filtres)
+- [📤 Sorties personnalisées](#-sorties-personnalisées)
+- [🩹 Édition & patch](#-édition--patch)
+- [🧨 Delete rapide](#-delete-rapide)
+- [🐚 Exec, logs, cp, port-forward](#-exec-logs-cp-port-forward)
+- [🔐 Auth & RBAC](#-auth--rbac)
+- [🧭 Diff & dry-run](#-diff--dry-run)
+- [⏱️ Watch](#️-watch)
+- [🎁 Bonus — outputs vim/nvim friendly](#-bonus--outputs-vimnvim-friendly)
+
+</details>
+
 ## ⚡ À taper dans les 30 premières secondes
 
 ```bash

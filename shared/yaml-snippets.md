@@ -2,6 +2,31 @@
 
 > Manifests minimaux, indentation 2 espaces, forme compacte quand possible. Objectif = **gain de temps**, pas complétude.
 
+<details>
+<summary>📑 Sommaire</summary>
+
+- [Pod](#pod)
+  - [Pod avec resources + probes + env](#pod-avec-resources--probes--env)
+  - [Multi-container (sidecar log shipper)](#multi-container-sidecar-log-shipper)
+  - [Init container](#init-container)
+- [Deployment](#deployment)
+- [DaemonSet (avec toutes tolérations)](#daemonset-avec-toutes-tolérations)
+- [StatefulSet + Headless Service](#statefulset--headless-service)
+- [Job / CronJob](#job--cronjob)
+- [Service (tous types)](#service-tous-types)
+  - [NodePort explicite](#nodeport-explicite)
+  - [ExternalName](#externalname)
+- [Ingress](#ingress)
+- [NetworkPolicy — patterns essentiels](#networkpolicy--patterns-essentiels)
+- [ConfigMap / Secret](#configmap--secret)
+- [PersistentVolume / PersistentVolumeClaim](#persistentvolume--persistentvolumeclaim)
+- [RBAC](#rbac)
+- [ResourceQuota + LimitRange](#resourcequota--limitrange)
+- [PodDisruptionBudget](#poddisruptionbudget)
+- [HPA v2](#hpa-v2)
+
+</details>
+
 ## Pod
 
 ```yaml

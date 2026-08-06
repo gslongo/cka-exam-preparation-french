@@ -2,6 +2,33 @@
 
 > **CKA — 25 %** · Domaine le plus large. Inclut RBAC, kubeadm, HA, CRI, extensions.
 
+<details>
+<summary>📑 Sommaire</summary>
+
+- [🎯 Objectifs de l'exam](#-objectifs-de-lexam)
+- [🧠 Concepts clés](#-concepts-clés)
+  - [Considérations d'installation (checklist pré-déploiement)](#considérations-dinstallation-checklist-pré-déploiement)
+  - [HA — Stacked vs external etcd](#ha--stacked-vs-external-etcd)
+  - [CRI · CNI · CSI · Device Plugins](#cri--cni--csi--device-plugins)
+  - [Composants du control plane](#composants-du-control-plane)
+  - [Composants d'un worker](#composants-dun-worker)
+  - [Add-ons & agents réseau](#add-ons--agents-réseau)
+  - [Object model](#object-model)
+  - [Accès à l'API — pipeline de requête](#accès-à-lapi--pipeline-de-requête)
+  - [RBAC](#rbac)
+  - [CRD & Custom Resources](#crd--custom-resources)
+- [📋 Commandes essentielles](#-commandes-essentielles)
+- [📄 YAML de référence](#-yaml-de-référence)
+- [⚠️ Pièges fréquents](#️-pièges-fréquents)
+  - [kubeadm / installation](#kubeadm--installation)
+  - [RBAC](#rbac-1)
+  - [Certificats](#certificats)
+  - [etcd](#etcd)
+  - [🔒 Encryption at rest des Secrets (etcd)](#-encryption-at-rest-des-secrets-etcd)
+- [🔗 Docs officielles autorisées](#-docs-officielles-autorisées)
+
+</details>
+
 ## 🎯 Objectifs de l'exam
 
 - Gérer les rôles RBAC (`Role`, `ClusterRole`, `RoleBinding`, `ClusterRoleBinding`) et les `ServiceAccount`
@@ -13,18 +40,58 @@
 
 ## 🧠 Concepts clés
 
+### Considérations d'installation (checklist pré-déploiement)
+
+Avant de lancer `kubeadm init`, 5 décisions structurantes (LFS258) :
+
+| Décision | Options | Impact CKA |
+|---|---|---|
+| **Où héberger ?** | Public cloud / private cloud / on-premises · nodes physiques ou VM | Détermine le provisioning ; l'exam = VM kubeadm |
+| **OS des nodes** | Debian, Ubuntu, CentOS Stream, ou *container-optimized* (Fedora CoreOS, RHEL CoreOS) | Ubuntu = le plus courant en exam/lab |
+| **Networking / CNI** | Besoin d'un **overlay** (VXLAN) pour le trafic pod-to-pod ? | Choix du CNI (Calico, Flannel…) ; overlay = simple mais +latence |
+| **Emplacement etcd** | **External** / **stacked** (colocalisé sur CP) / **embedded** | Voir HA ci-dessous ; stacked = défaut kubeadm |
+| **HA du control plane ?** | Oui/non → failover + redondance | Multi-CP + LB en façade ; quorum etcd impair |
+
+> 💡 **Overlay vs non-overlay** :
+> - **Overlay** (VXLAN/IPIP) : encapsule le trafic pod → marche partout, même sans contrôle du réseau sous-jacent. Léger surcoût CPU/latence. (Flannel VXLAN, Calico VXLAN)
+> - **Non-overlay / natif** (BGP) : route les IP de pods directement sur le réseau → meilleures perfs, mais demande un réseau qui coopère (BGP). (Calico BGP, kube-router)
+
+### HA — Stacked vs external etcd
+
+| Topologie | etcd | Nb nodes CP min | Fault tolerance |
+|---|---|---|---|
+| **Stacked** | Sur les nodes CP | 3 | 1 (quorum 2/3) |
+| **External** | Cluster etcd séparé | 3 CP + 3 etcd | 1 chacun |
+
+- **Quorum etcd** = `(N/2) + 1`. Toujours un **nombre impair** de membres (3, 5, 7).
+- Recommandation prod : **5 membres etcd** (tolère 2 pertes).
+- **LB en façade** des apiservers = **L4 / TCP pass-through** (HAProxy/nginx en mode TCP), **pas** L7 avec terminaison TLS — l'apiserver gère lui-même la mTLS. Adresse du LB = `controlPlaneEndpoint`.
+
+### CRI · CNI · CSI · Device Plugins
+
+| Interface | Rôle | Exemples |
+|---|---|---|
+| **CRI** | Runtime containers | containerd, CRI-O |
+| **CNI** | Réseau des Pods | Calico, Cilium, Flannel, Weave |
+| **CSI** | Storage | AWS EBS, Ceph, NFS, Longhorn |
+| **Device Plugin** | Hardware (GPU, FPGA) | NVIDIA, Intel |
+
+> 💡 **CRI & OCI** : le runtime doit implémenter l'interface **CRI** (côté kubelet) et respecter les standards **OCI** (format d'image + runtime). Tout runtime OCI-compliant est supporté.
+> - Le runtime gère le **bas niveau** : pull des images, cycle de vie des conteneurs, remontée des **métriques** au kubelet.
+> - Chaque node peut *théoriquement* utiliser un **runtime différent** (containerd sur l'un, CRI-O sur l'autre) tant qu'il est CRI-compliant — rare en pratique, mais possible.
+
 ### Composants du control plane
 
 | Composant | Rôle | Port | Static Pod ? |
 |---|---|---|---|
 | `kube-apiserver` | API REST, gateway unique du cluster | 6443 | ✅ |
-| `etcd` | Store clé-valeur (state du cluster, JSON encodés) | 2379 (client) / 2380 (peer) | ✅ |
+| `etcd` | Store clé-valeur (state du cluster, JSON encodés) | 2379 (client) / 2380 (peer) | ✅ si stacked |
 | `kube-scheduler` | Attribue les Pods aux Nodes | 10259 | ✅ |
 | `kube-controller-manager` | Boucles de contrôle (Node, Deployment, Endpoint…) | 10257 | ✅ |
 | `cloud-controller-manager` | Intégration cloud (LB, volumes) | 10258 | optionnel |
 
 > 📝 **controller-manager en détail** : daemon de **boucles de réconciliation** (reconciliation loops). Il compare en continu l'état *courant* (lu via l'apiserver) à l'état *désiré* et déclenche le controller adéquat (Node, ReplicaSet, Endpoint, Namespace…) pour combler l'écart. Un seul binaire = plusieurs dizaines de controllers.
->
+
 > ☁️ **cloud-controller-manager (CCM)** — beta en **v1.11**. Sépare la logique *cloud-specific* (LB, volumes, routes, node lifecycle) du kube-controller-manager, pour que les providers évoluent sans toucher au cœur de K8s.
 > - Activation : chaque **kubelet** doit tourner avec `--cloud-provider=external`.
 > - Absent d'un cluster kubeadm nu (donc **pas à l'exam**) ; sur EKS/GKE/AKS il est **géré par le provider**, invisible pour toi.
@@ -99,7 +166,7 @@ Au-delà des composants « core », un cluster fait tourner des **add-ons** (sou
 
 | Add-on | Rôle | Note exam |
 |---|---|---|
-| **CoreDNS** | DNS interne : résout `<svc>.<ns>.svc.cluster.local`. **Remplace kube-dns** (défaut depuis 1.13). Architecture **modulaire à plugins** (cache, filtrage, forward…). | ⭐ Souvent la cause d'un « service injoignable par nom » (cf. Q17). |
+| **CoreDNS** | DNS interne : résout `<svc>.<ns>.svc.cluster.local`. **Remplace kube-dns** (défaut depuis 1.13). Architecture **modulaire à plugins** (cache, filtrage, forward…). | ⭐ Souvent la cause d'un « service injoignable par nom » (cf. [Q17](QUESTIONS-EXAMEN.md)). |
 | **Agents CNI** | Selon le plugin (Calico, Cilium, Flannel…), des Pods gèrent le routage, l'IPAM et l'application des **NetworkPolicy**. | Flannel **n'applique pas** les NetPol ; Calico/Cilium oui. |
 | **kube-proxy** | Programme iptables/IPVS/nftables pour les Services (souvent un DaemonSet). | Déjà couvert côté worker. |
 | **Logging (ex. Fluentd)** | K8s n'a **pas** de logging cluster-wide intégré. Une solution externe (Fluentd — projet CNCF, souvent en DaemonSet) collecte les logs des Pods/nodes, filtre, bufferise et route vers un stockage/analyse. | Culture. À l'exam : les logs se lisent avec `kubectl logs` / `crictl logs`, pas d'agrégateur. |
@@ -119,7 +186,7 @@ Au-delà des composants « core », un cluster fait tourner des **add-ons** (sou
 > |---|---|
 > | `default` | Ressources sans namespace explicite. |
 > | `kube-system` | Composants système (CoreDNS, kube-proxy, CNI, controllers…). |
-> | `kube-node-lease` | Objets `Lease` des nodes (heartbeat rapide → santé node, cf. Q4). |
+> | `kube-node-lease` | Objets `Lease` des nodes (heartbeat rapide → santé node, cf. [Q4](QUESTIONS-EXAMEN.md)). |
 > | `kube-public` | **Lisible sans authentification** — infos publiques du cluster (ex: `cluster-info`). Rarement utilisé. |
 >
 > Ressources **cluster-scoped** (Node, PV, ClusterRole, Namespace lui-même) n'appartiennent à **aucun** namespace. `kubectl api-resources --namespaced=false` les liste.
@@ -139,6 +206,99 @@ Au-delà des composants « core », un cluster fait tourner des **add-ons** (sou
 > Le suffixe se lit dans l'`apiVersion` : `v1` (stable) → `apps/v1` ; `v1beta1` → `flowcontrol.apiserver.k8s.io/v1beta1`.
 > Nuance : « beta enabled by default » ne vaut que pour les **anciennes** beta APIs ; depuis **K8s 1.24**, les **nouvelles** beta APIs sont **désactivées** par défaut.
 
+### Accès à l'API — pipeline de requête
+
+Toute requête au `kube-apiserver` passe par **3 étapes** (en **TLS**, certs gérés par kubeadm) :
+
+```mermaid
+graph LR
+    C[Client kubectl/SA] -->|TLS| AuthN[1. Authentication<br/>qui es-tu ?]
+    AuthN --> AuthZ[2. Authorization<br/>as-tu le droit ?]
+    AuthZ --> Adm[3. Admission Control<br/>mutating → validating]
+    Adm --> ETCD[(etcd)]
+```
+
+1. **Authentication** — vérifie l'**identité**. Deux types de sujets : **normal users** (humains, gérés **hors** cluster : x509, OIDC, webhook) et **ServiceAccounts** (gérés **dans** K8s, pour les Pods/workloads). Modules essayés en séquence, premier succès gagne. ⚠️ Pas de « user object » natif. ⚠️ *basic auth / static password file* **supprimés en 1.19** — hors exam v1.35.
+2. **Authorization** — vérifie les **droits** : **RBAC** (défaut kubeadm), aussi `Node`, `ABAC`, `Webhook`. Modules en chaîne → premier **allow** gagne, sinon deny.
+3. **Admission Control** — valide/modifie la requête : **mutating** d'abord (peut réécrire, ex. injecter defaults), puis **validating** (accepte/rejette, ex. `PodSecurity`, `ResourceQuota`).
+
+> 🔧 **Activer/désactiver un plugin d'admission** : flags `--enable-admission-plugins=` / `--disable-admission-plugins=` du `kube-apiserver`. En kubeadm = static Pod → éditer `/etc/kubernetes/manifests/kube-apiserver.yaml`, l'apiserver **redémarre automatiquement**.
+>
+> Plugins clés : `NamespaceLifecycle`, `LimitRanger`, `ResourceQuota`, `PodSecurity`, `MutatingAdmissionWebhook`, `ValidatingAdmissionWebhook`.
+>
+> Inspecter : `grep admission /etc/kubernetes/manifests/kube-apiserver.yaml`. **`NodeRestriction`** est activé **par défaut par kubeadm** (limite chaque kubelet à modifier seulement son propre Node + ses Pods).
+
+> 🔑 **Ordre à retenir** : **AuthN → AuthZ → Admission → etcd**. Un `403 Forbidden` = échec AuthZ (RBAC) ; un `401 Unauthorized` = échec AuthN.
+
+> 🔐 **Créer un « user » = émettre un cert client x509** (il n'existe **pas** d'objet User dans K8s — un user n'est que l'identité lue dans un cert authentifié) :
+> - **Identité** : **`CN` (Common Name) = username**, **`O` (Organization) = group** (plusieurs `O` = plusieurs groups). Ex. `-subj "/CN=DevDan/O=development"` → user `DevDan`, groupe `development`.
+> - **Deux façons de signer** : (1) **CSR API** (`CertificateSigningRequest` + `kubectl certificate approve`, cf. [Q18](QUESTIONS-EXAMEN.md)) — méthode « native » ; (2) **openssl direct** contre `/etc/kubernetes/pki/ca.{crt,key}` (`openssl x509 -req -CA ... -CAkey ...`) — plus rapide en lab.
+>
+> Ce cert = le **sujet** (`user`/`group`) que le `RoleBinding`/`ClusterRoleBinding` référencera ensuite pour l'autoriser (voir RBAC ci-dessous).
+
+### RBAC
+
+```mermaid
+graph LR
+    U[User/SA/Group] -->|RoleBinding| R[Role]
+    U -->|RoleBinding| CR[ClusterRole]
+    U -->|ClusterRoleBinding| CR
+    R -->|apiGroups + resources + verbs| API[Ressources du namespace]
+    CR -->|via RoleBinding| API3[Portee limitee a 1 namespace]
+    CR -->|via ClusterRoleBinding| API2[Ressources cluster ou tous NS]
+```
+
+- `Role` = namespace-scoped ; `ClusterRole` = cluster-scoped
+- Un `RoleBinding` peut référencer un `ClusterRole` (utile pour donner des perms de type "admin" dans un seul namespace)
+- **RBAC est purement additif** : aucune règle de **deny**. Un sujet est autorisé s'il matche **≥ 1** règle `allow` (union de tous ses bindings) ; sinon refus par défaut. On ne « soustrait » jamais un droit — on ne l'accorde simplement pas.
+- **Sujets** : un binding lie un droit à un `user`, un `group` ou un `ServiceAccount`. Les users/groups n'existent pas comme objets — ils proviennent de l'**AuthN** (cert x509 : `CN`=user, `O`=group). Voir *Accès à l'API* ci-dessus pour créer/signer un cert user.
+- **ServiceAccount** par défaut : `default` dans chaque namespace, **peu de droits**. Créer un SA dédié par app.
+
+#### Anatomie d'une règle : `apiGroups` × `resources` × `verbs`
+
+Une entrée de `rules[]` est un **produit** de 3 listes : elle autorise **chaque `verb`** sur **chaque `resource`** appartenant à **chacun des `apiGroups`** cités. Les trois sont liés — une `resource` n'a de sens que **dans son apiGroup**.
+
+```yaml
+rules:
+- apiGroups: ["apps"]              # QUEL groupe d'API
+  resources: ["deployments"]       # QUEL type (doit vivre dans ce groupe)
+  verbs: ["get", "list", "watch"]  # QUELLES actions
+```
+
+**Lien `apiGroups` ↔ `resources`** : chaque ressource vit dans **exactement un** apiGroup. L'`apiVersion` d'un manifest révèle le groupe → `apps/v1` = groupe `apps` ; **`v1` seul = core group**, qui s'écrit **`""` (chaîne vide)** dans un `Role`, jamais `"core"`.
+
+| `apiGroups` | `apiVersion` du manifest | `resources` typiques |
+|---|---|---|
+| `""` (**core**) | `v1` | `pods`, `services`, `endpoints`, `secrets`, `configmaps`, `persistentvolumeclaims`, `serviceaccounts`, `nodes`, `namespaces` |
+| `"apps"` | `apps/v1` | `deployments`, `replicasets`, `daemonsets`, `statefulsets` |
+| `"batch"` | `batch/v1` | `jobs`, `cronjobs` |
+| `"networking.k8s.io"` | `networking.k8s.io/v1` | `networkpolicies`, `ingresses` |
+| `"rbac.authorization.k8s.io"` | `rbac.authorization.k8s.io/v1` | `roles`, `rolebindings`, `clusterroles`, `clusterrolebindings` |
+| `"storage.k8s.io"` | `storage.k8s.io/v1` | `storageclasses`, `volumeattachments` |
+| `"apiextensions.k8s.io"` | `apiextensions.k8s.io/v1` | `customresourcedefinitions` |
+
+> 🔑 **Trouver le triplet** : `kubectl api-resources` donne les colonnes **APIVERSION** (→ apiGroup) · **NAME** (→ resource, au **pluriel**) · **VERBS**. Ex. `kubectl api-resources --api-group=apps -o wide`. Toujours le **pluriel** dans `resources` (`pods`, pas `Pod`).
+> - **Sous-ressources** avec `/` : `pods/log`, `pods/exec`, `pods/portforward`, `deployments/scale`, `<cr>/status`. Le droit sur `pods` ne couvre **pas** `pods/log` → il faut l'ajouter explicitement.
+> - `resources: ["*"]` / `apiGroups: ["*"]` / `verbs: ["*"]` = wildcard (large — à éviter hors cluster-admin).
+
+**Verbs** — les actions accordées :
+
+| Verbe | Action | Verbe HTTP |
+|---|---|---|
+| `get` | Lire **un** objet nommé | GET |
+| `list` | Lister une **collection** ⚠️ renvoie le **contenu** des objets (dont les `secrets`) | GET |
+| `watch` | Flux temps réel des changements | GET (stream) |
+| `create` | Créer | POST |
+| `update` | Remplacer entièrement | PUT |
+| `patch` | Modifier partiellement | PATCH |
+| `delete` | Supprimer un objet nommé | DELETE |
+| `deletecollection` | Supprimer **en masse** (toute une collection) | DELETE |
+
+> ⚠️ `list` ≠ `get` : accorder `list` sur `secrets` **révèle leur contenu**, pas juste leurs noms. Ne pas le donner à la légère.
+> 💡 **Verbs spéciaux** (non-CRUD, sur des ressources précises) : `bind`/`escalate` (sur `roles`/`clusterroles`, pour empêcher l'élévation de privilèges), `impersonate` (sur `users`/`groups`/`serviceaccounts`), `approve` (sur `certificatesigningrequests`), `use` (sur les PSP/SCC).
+
+> ⚠️ Point examinable : depuis 1.24, les Secrets de type `kubernetes.io/service-account-token` ne sont **plus créés automatiquement** pour les SA. Utiliser `kubectl create token <sa>` (durée courte) ou créer un Secret manuellement avec l'annotation.
+
 ### CRD & Custom Resources
 
 > 🆕 **Examinable CKA depuis 2025** (« Understand CRDs, install and configure operators », domaine Cluster Architecture). Niveau **admin/opérateur** : installer et utiliser, **pas** coder un controller.
@@ -148,6 +308,20 @@ Au-delà des composants « core », un cluster fait tourner des **add-ons** (sou
   - **CRD** (CustomResourceDefinition) : un simple YAML déclare un nouveau type. Simple, sans infra, le cas courant. ⭐ **C'est ce que teste le CKA.**
   - **Aggregated API** : un serveur d'API dédié branché sur le kube-apiserver. Très flexible mais lourd (dev + infra). **Savoir que ça existe**, pas plus.
 - ⚠️ **RBAC** : une CRD ne donne **aucun droit** automatiquement. Il faut un `Role`/`ClusterRole` explicite sur le nouveau type (apiGroup de la CRD + `resources` = plural) pour que users/SA puissent l'utiliser.
+
+  ```yaml
+  # Role donnant accès au CR "backups" (group stable.linux.com)
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: Role
+  metadata: { name: backup-editor, namespace: default }
+  rules:
+  - apiGroups: ["stable.linux.com"]   # = spec.group de la CRD, PAS apiextensions.k8s.io
+    resources: ["backups"]            # = spec.names.plural (jamais le kind)
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Sous-ressource éventuelle : resources: ["backups/status"] pour le status
+  ```
+
+  > 🔑 Deux pièges : (1) mettre `apiextensions.k8s.io` (group de la CRD) au lieu du group **du CR** → droits sur la définition, pas sur les instances ; (2) mettre le `kind` (`BackUp`) au lieu du **plural** (`backups`) dans `resources`. Gérer la CRD elle-même (create/delete la *définition*) = `apiGroups: ["apiextensions.k8s.io"]`, `resources: ["customresourcedefinitions"]` — cluster-scoped, donc `ClusterRole`.
 - **La CRD elle-même** appartient au group **`apiextensions.k8s.io/v1`** (`kind: CustomResourceDefinition`). Ne pas confondre avec le group **du CR** que tu déclares (`spec.group`, ex. `stable.example.com`).
 - **Champs clés d'un CRD** : `spec.group`, `spec.versions[]` (avec `schema` **OpenAPI v3** = validation des champs), `spec.scope` (**`Namespaced`** ou **`Cluster`**), `spec.names` (`kind`, `plural`, `singular`, `shortNames`).
 - **Operator** = CRD **+** controller custom (reconcile loop qui watch les CR et agit). La CRD seule ne fait **rien** — elle déclare juste un type ; c'est le controller qui lui donne un comportement.
@@ -209,86 +383,6 @@ kubectl describe ct new-cron-object
 ```
 
 > ⚠️ **`kubectl delete -f crd.yaml` supprime la CRD ET en cascade tous les CR de ce type** (tous les objets `CronTab`). Destruction massive silencieuse — attention en prod.
-
-### Accès à l'API — pipeline de requête
-
-Toute requête au `kube-apiserver` passe par **3 étapes** (en **TLS**, certs gérés par kubeadm) :
-
-```mermaid
-graph LR
-    C[Client kubectl/SA] -->|TLS| AuthN[1. Authentication<br/>qui es-tu ?]
-    AuthN --> AuthZ[2. Authorization<br/>as-tu le droit ?]
-    AuthZ --> Adm[3. Admission Control<br/>mutating → validating]
-    Adm --> ETCD[(etcd)]
-```
-
-1. **Authentication** — vérifie l'**identité**. Deux types de sujets : **normal users** (humains, gérés **hors** cluster : x509, OIDC, webhook) et **ServiceAccounts** (gérés **dans** K8s, pour les Pods/workloads). Modules essayés en séquence, premier succès gagne. ⚠️ Pas de « user object » natif. ⚠️ *basic auth / static password file* **supprimés en 1.19** — hors exam v1.35.
-2. **Authorization** — vérifie les **droits** : **RBAC** (défaut kubeadm), aussi `Node`, `ABAC`, `Webhook`. Modules en chaîne → premier **allow** gagne, sinon deny.
-3. **Admission Control** — valide/modifie la requête : **mutating** d'abord (peut réécrire, ex. injecter defaults), puis **validating** (accepte/rejette, ex. `PodSecurity`, `ResourceQuota`).
-
-> � **Activer/désactiver un plugin d'admission** : flags `--enable-admission-plugins=` / `--disable-admission-plugins=` du `kube-apiserver`. En kubeadm = static Pod → éditer `/etc/kubernetes/manifests/kube-apiserver.yaml`, l'apiserver **redémarre automatiquement**. Plugins clés : `NamespaceLifecycle`, `LimitRanger`, `ResourceQuota`, `PodSecurity`, `MutatingAdmissionWebhook`, `ValidatingAdmissionWebhook`.
-> Inspecter : `grep admission /etc/kubernetes/manifests/kube-apiserver.yaml`. **`NodeRestriction`** est activé **par défaut par kubeadm** (limite chaque kubelet à modifier seulement son propre Node + ses Pods).
-> �🔑 Ordre à retenir : **AuthN → AuthZ → Admission → etcd**. Un `403 Forbidden` = échec AuthZ (RBAC) ; un `401 Unauthorized` = échec AuthN.
-
-### RBAC
-
-```mermaid
-graph LR
-    U[User/SA/Group] -->|RoleBinding| R[Role]
-    U -->|ClusterRoleBinding| CR[ClusterRole]
-    R -->|apiGroups + resources + verbs| API[Ressources namespace]
-    CR --> API2[Ressources cluster ou tous NS]
-```
-
-- `Role` = namespace-scoped ; `ClusterRole` = cluster-scoped
-- Un `RoleBinding` peut référencer un `ClusterRole` (utile pour donner des perms de type "admin" dans un seul namespace)
-- **RBAC est purement additif** : aucune règle de **deny**. Un sujet est autorisé s'il matche **≥ 1** règle `allow` (union de tous ses bindings) ; sinon refus par défaut. On ne « soustrait » jamais un droit — on ne l'accorde simplement pas.
-- **Identité x509** : dans un cert client, **`CN` (Common Name) = username** et **`O` (Organization) = group** (plusieurs `O` = plusieurs groups). C'est ce que K8s lit pour l'AuthN — il n'y a pas d'objet User. Ex. `-subj "/CN=DevDan/O=development"` → user `DevDan`, groupe `development`.
-- **Deux façons de signer un cert user** : (1) **CSR API** (`CertificateSigningRequest` + `kubectl certificate approve`, cf. Q18) — méthode « native » ; (2) **openssl direct** contre `/etc/kubernetes/pki/ca.{crt,key}` (`openssl x509 -req -CA ... -CAkey ...`) — plus rapide en lab.
-- **Verbs** courants : `get, list, watch, create, update, patch, delete, deletecollection`
-- **ServiceAccount** par défaut : `default` dans chaque namespace, **peu de droits**. Créer un SA dédié par app.
-
-> ⚠️ Point examinable : depuis 1.24, les Secrets de type `kubernetes.io/service-account-token` ne sont **plus créés automatiquement** pour les SA. Utiliser `kubectl create token <sa>` (durée courte) ou créer un Secret manuellement avec l'annotation.
-
-### Considérations d'installation (checklist pré-déploiement)
-
-Avant de lancer `kubeadm init`, 5 décisions structurantes (LFS258) :
-
-| Décision | Options | Impact CKA |
-|---|---|---|
-| **Où héberger ?** | Public cloud / private cloud / on-premises · nodes physiques ou VM | Détermine le provisioning ; l'exam = VM kubeadm |
-| **OS des nodes** | Debian, Ubuntu, CentOS Stream, ou *container-optimized* (Fedora CoreOS, RHEL CoreOS) | Ubuntu = le plus courant en exam/lab |
-| **Networking / CNI** | Besoin d'un **overlay** (VXLAN) pour le trafic pod-to-pod ? | Choix du CNI (Calico, Flannel…) ; overlay = simple mais +latence |
-| **Emplacement etcd** | **External** / **stacked** (colocalisé sur CP) / **embedded** | Voir HA ci-dessous ; stacked = défaut kubeadm |
-| **HA du control plane ?** | Oui/non → failover + redondance | Multi-CP + LB en façade ; quorum etcd impair |
-
-> 💡 **Overlay vs non-overlay** :
-> - **Overlay** (VXLAN/IPIP) : encapsule le trafic pod → marche partout, même sans contrôle du réseau sous-jacent. Léger surcoût CPU/latence. (Flannel VXLAN, Calico VXLAN)
-> - **Non-overlay / natif** (BGP) : route les IP de pods directement sur le réseau → meilleures perfs, mais demande un réseau qui coopère (BGP). (Calico BGP, kube-router)
-
-### HA — Stacked vs external etcd
-
-| Topologie | etcd | Nb nodes CP min | Fault tolerance |
-|---|---|---|---|
-| **Stacked** | Sur les nodes CP | 3 | 1 (quorum 2/3) |
-| **External** | Cluster etcd séparé | 3 CP + 3 etcd | 1 chacun |
-
-- **Quorum etcd** = `(N/2) + 1`. Toujours un **nombre impair** de membres (3, 5, 7).
-- Recommandation prod : **5 membres etcd** (tolère 2 pertes).
-- **LB en façade** des apiservers = **L4 / TCP pass-through** (HAProxy/nginx en mode TCP), **pas** L7 avec terminaison TLS — l'apiserver gère lui-même la mTLS. Adresse du LB = `controlPlaneEndpoint`.
-
-### CRI · CNI · CSI · Device Plugins
-
-| Interface | Rôle | Exemples |
-|---|---|---|
-| **CRI** | Runtime containers | containerd, CRI-O |
-| **CNI** | Réseau des Pods | Calico, Cilium, Flannel, Weave |
-| **CSI** | Storage | AWS EBS, Ceph, NFS, Longhorn |
-| **Device Plugin** | Hardware (GPU, FPGA) | NVIDIA, Intel |
-
-> 💡 **CRI & OCI** : le runtime doit implémenter l'interface **CRI** (côté kubelet) et respecter les standards **OCI** (format d'image + runtime). Tout runtime OCI-compliant est supporté.
-> - Le runtime gère le **bas niveau** : pull des images, cycle de vie des conteneurs, remontée des **métriques** au kubelet.
-> - Chaque node peut *théoriquement* utiliser un **runtime différent** (containerd sur l'un, CRI-O sur l'autre) tant qu'il est CRI-compliant — rare en pratique, mais possible.
 
 ## 📋 Commandes essentielles
 
@@ -439,7 +533,7 @@ cgroupDriver: systemd     # doit correspondre au runtime (containerd)
 
 ### RBAC
 - `RoleBinding` référençant un `ClusterRole` → droits **limités au namespace du RB**.
-- SA sans `automountServiceAccountToken: false` sur workloads sans besoin d'API → surface d'attaque.
+- **Token SA monté par défaut** : chaque Pod reçoit automatiquement le token de son ServiceAccount dans `/var/run/secrets/...`. Pour un workload qui **ne parle pas** à l'API, ce token est une **surface d'attaque inutile** (un Pod compromis = token volé). → poser `automountServiceAccountToken: false` (sur le `ServiceAccount` ou dans la `spec` du Pod) pour ne pas le monter.
 - `system:` prefix → **réservé K8s**. Ne pas créer d'objets avec ce préfixe.
 
 ### Certificats

@@ -2,6 +2,36 @@
 
 > **CKA — 30 %** · Le domaine à **maîtriser en priorité absolue**. Beaucoup de questions "réparer un cluster/Pod cassé".
 
+<details>
+<summary>📑 Sommaire</summary>
+
+- [🎯 Objectifs de l'exam](#-objectifs-de-lexam)
+- [🧠 Concepts clés](#-concepts-clés)
+  - [Méthode générale — top-down](#méthode-générale--top-down)
+  - [🩺 Triage control plane — santé globale (à faire en premier)](#-triage-control-plane--santé-globale-à-faire-en-premier)
+  - [Diagnostic Pod — checklist](#diagnostic-pod--checklist)
+  - [États container courants](#états-container-courants)
+  - [Debug node depuis le control plane](#debug-node-depuis-le-control-plane)
+  - [Sur le node lui-même (SSH)](#sur-le-node-lui-même-ssh)
+  - [Diagnostic réseau/DNS](#diagnostic-réseaudns)
+  - [Diagnostic scheduling](#diagnostic-scheduling)
+  - [metrics-server](#metrics-server)
+  - [Ressource / Namespace bloqué en `Terminating`](#ressource--namespace-bloqué-en-terminating)
+- [📋 Commandes essentielles](#-commandes-essentielles)
+- [📄 YAML de référence](#-yaml-de-référence)
+- [⚠️ Pièges fréquents](#️-pièges-fréquents)
+  - [Self-healing — ce qui est vrai / faux](#self-healing--ce-qui-est-vrai--faux)
+  - [Pod ne démarre pas](#pod-ne-démarre-pas)
+  - [CrashLoopBackOff](#crashloopbackoff)
+  - [Node NotReady](#node-notready)
+  - [API server injoignable](#api-server-injoignable)
+  - [DNS](#dns)
+  - [Service sans trafic](#service-sans-trafic)
+  - [etcd](#etcd)
+- [🔗 Docs officielles autorisées](#-docs-officielles-autorisées)
+
+</details>
+
 ## 🎯 Objectifs de l'exam
 
 - Évaluer la santé d'un cluster et d'applications
@@ -25,6 +55,50 @@ graph TD
     F -->|Yes| G[Réseau/DNS/svc endpoints]
     F -->|No| H[Node: kubelet, disk, mem, CRI]
 ```
+
+### 🩺 Triage control plane — santé globale (à faire en premier)
+
+> Réflexe : avant de plonger dans un Pod, vérifier que le CP lui-même est sain. Ordre du plus global au plus fin.
+
+```bash
+# 1. L'apiserver répond-il tout court ?
+kubectl version                       # timeout ici = apiserver/LB injoignable → passer en "node local" (étape 7)
+kubectl get --raw='/healthz'          # "ok" attendu
+kubectl get --raw='/readyz?verbose'   # détail check par check → inclut déjà [+]etcd ok (check etcd de base)
+kubectl get --raw='/livez?verbose'    # apiserver vivant (≠ prêt)
+
+# 2. Vue nodes : le CP voit-il tout le monde ?
+kubectl get nodes -o wide             # tous Ready ? versions homogènes ?
+
+# 3. Les 4 static pods du CP tournent-ils ?
+kubectl -n kube-system get pods -o wide \
+  -l tier=control-plane               # apiserver, etcd, scheduler, controller-manager
+# ou par composant : -l component=kube-scheduler / =kube-controller-manager / =etcd
+
+# 4. etcd — drill-down SEULEMENT si l'étape 1 montre [-]etcd failed (ou en HA, pour voir QUEL membre)
+#    /readyz?verbose donne déjà le check etcd de base ; ici = détail par membre / leader / DB size
+kubectl -n kube-system exec etcd-<node> -- etcdctl \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/server.crt \
+  --key=/etc/kubernetes/pki/etcd/server.key \
+  --endpoints=https://127.0.0.1:2379 endpoint health   # + endpoint status -w table en HA
+
+# 5. Scheduler / controller-manager vivants
+#    component= possibles : kube-apiserver | etcd | kube-scheduler | kube-controller-manager
+kubectl -n kube-system logs -l component=kube-scheduler --tail=20
+kubectl -n kube-system logs -l component=kube-controller-manager --tail=20
+
+# 6. Events récents à l'échelle cluster
+kubectl get events -A --sort-by=.lastTimestamp | tail -20
+
+# 7. Si apiserver injoignable → SSH sur le CP (kubectl ne marche plus) :
+crictl ps -a | grep -E 'apiserver|etcd|scheduler|controller'   # containers CP up ?
+ls /etc/kubernetes/manifests/                                  # les 4 manifests présents ?
+journalctl -u kubelet -e | grep -i error                       # kubelet relit-il les static pods ?
+sudo crictl logs <apiserver-container-id>                       # cause du crash
+```
+
+> 💡 **Logique** : `kubectl` répond → problème *dans* le cluster (étapes 2-6). `kubectl` timeout → problème *sous* le cluster (apiserver/etcd/kubelet, étape 7, en SSH). `componentstatuses` (`kubectl get cs`) donne un résumé scheduler/cm/etcd mais est **déprécié** — utiliser `/readyz?verbose` à la place.
 
 ### Diagnostic Pod — checklist
 
@@ -116,6 +190,7 @@ kubectl describe node <n>                    # Conditions, Allocatable, Taints, 
 - Fournit `kubectl top` (nodes, pods)
 - Deployment dans `kube-system`
 - Signes qu'il n'est **pas** installé : `error: Metrics API not available`
+- 📦 **Install ≠ dans la doc autorisée** : metrics-server est un projet **SIG séparé** (`kubernetes-sigs/metrics-server`), pas documenté sur kubernetes.io — seul le repo GitHub porte le manifest (`kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml`). GitHub n'étant **pas** dans les domaines autorisés en exam, une **install from scratch est improbable au CKA**. Le cas réaliste = un metrics-server **déjà déployé mais cassé** à débugger (voir ci-dessous).
 - 🔎 **metrics-server = une Aggregated API** (`v1beta1.metrics.k8s.io`), enregistrée via un objet **`APIService`**. Si `kubectl top` échoue, vérifier : `kubectl get apiservices | grep metrics` → colonne `AVAILABLE` doit être `True` (sinon `False (MissingEndpoints/...)` = pod metrics-server KO ou aggregation layer HS).
 - ⭐ **Fix kubeadm récurrent — erreur TLS kubelet** : logs = `x509: cannot validate certificate ... doesn't contain any IP SANs`. metrics-server scrape le kubelet en HTTPS (port 10250) mais le certif kubelet est self-signed / sans IP SAN. Correctif :
 
@@ -127,6 +202,16 @@ kubectl describe node <n>                    # Conditions, Allocatable, Taints, 
     ```
 
     TLS reste chiffré mais non vérifié → OK lab/exam, à éviter en prod (vraie solution : `serverTLSBootstrap`).
+
+### Ressource / Namespace bloqué en `Terminating`
+
+- Cause quasi systématique : un **finalizer** non résolu sur un objet (le controller censé le retirer est absent/HS, ex. CRD supprimée avant ses CR).
+- Diagnostic : `kubectl get <res> <name> -o yaml` → regarder `metadata.finalizers` + `deletionTimestamp` (présent = suppression déjà demandée, en attente).
+- Namespace coincé : trouver l'objet fautif dedans →
+  `kubectl api-resources --verbs=list --namespaced -o name | xargs -n1 kubectl get -n <ns>`
+- Fix propre : vider le finalizer de **l'objet** →
+  `kubectl patch <res> <name> -n <ns> --type=merge -p '{"metadata":{"finalizers":[]}}'`
+- ⚠️ Forcer le finalizer du **namespace** lui-même (`/finalize`) = **dernier recours** (laisse des ressources orphelines). Détail complet : cf. [PIÈGES](PIEGES-EXAMEN.md) T12.
 
 ## 📋 Commandes essentielles
 
@@ -211,7 +296,7 @@ spec:
   containers:
   - name: c
     image: nginx
-    startupProbe:                            # démarrages lents : ping avant l'activation des autres
+    startupProbe:                            # apps lentes : gèle liveness/readiness jusqu'au 1er succès → évite que liveness tue le container au boot (faux CrashLoop)
       httpGet: { path: /, port: 80 }
       failureThreshold: 30
       periodSeconds: 5
@@ -238,8 +323,8 @@ spec:
 ### Self-healing — ce qui est vrai / faux
 - Un `kind: Pod` seul **NE se répare PAS**. Si le Pod meurt ou son node tombe, personne ne le recrée.
 - Self-healing = propriété du **controller parent** (`Deployment`/`ReplicaSet`/`StatefulSet`/`DaemonSet`/`Job`).
-- `spec.restartPolicy` (`Always`/`OnFailure`/`Never`) contrôle uniquement le **redémarrage d'un container** par le kubelet, **au sein du Pod encore existant**. Ne recrée pas le Pod.
-- Éviction (node pressure, drain, taint `NoExecute`) tue le Pod ; sans controller → perdu.
+- `spec.restartPolicy` (`Always`/`OnFailure`/`Never`, **défaut `Always`**) contrôle uniquement le **redémarrage d'un container** par le kubelet, **au sein du Pod encore existant**. Ne recrée pas le Pod.
+- **Éviction** = K8s tue lui-même le Pod (≠ `kubectl delete`). 3 causes : **node pressure** (kubelet manque de RAM/disque/PID), **`kubectl drain`** (vidange d'un node pour maintenance), **taint `NoExecute`** (éjecte les Pods sans toleration). → avec controller : recréé ailleurs ; **bare Pod : perdu**.
 
 > 💡 Piège d'exam : "Créez un Pod avec `restartPolicy: Always` pour self-healing" = mauvais réflexe. **Toujours** un Deployment (ou équivalent) sauf demande explicite d'un bare Pod.
 
@@ -251,8 +336,8 @@ spec:
 
 ### CrashLoopBackOff
 - Backoff exponentiel : 10s → 20s → 40s… jusqu'à 5 min max.
-- **Toujours `kubectl logs -p`** (previous instance).
-- Vérifier la commande : `command:` **remplace** l'ENTRYPOINT ; `args:` remplace le CMD.
+- **Toujours `kubectl logs -p`** (`--previous`) : en CrashLoop le container courant vient de redémarrer (logs vides/partiels) → `-p` affiche les logs de l'**instance précédente qui a planté**, celle qui contient l'erreur.
+- Vérifier la commande : dans le Pod, `command:` **écrase** l'`ENTRYPOINT` de l'image et `args:` **écrase** le `CMD` (Dockerfile). Un override erroné (mauvais binaire, mauvais flag) fait sortir le container aussitôt → CrashLoop. Comparer avec l'image d'origine (`docker inspect` / doc de l'image).
 
 ### Node NotReady
 - 90 % des cas : `kubelet` down. Sur le node : `systemctl status kubelet` + `journalctl -u kubelet -e`.
@@ -260,20 +345,22 @@ spec:
 - Container runtime down : `systemctl status containerd`.
 
 ### API server injoignable
-- `kubectl` timeout : ping le VIP/LB. Sur le CP : `crictl ps | grep apiserver`.
+- `kubectl` timeout : d'abord isoler **réseau vs process**. Ping le VIP/LB (`curl -k https://<endpoint>:6443/healthz`) → si KO = LB/route/firewall. Sur le CP : `crictl ps | grep apiserver` → si le container **manque ou restart en boucle**, le problème est le static pod (voir ligne suivante) ; s'il tourne mais répond mal, tester `kubectl get --raw='/livez?verbose'` localement.
 - Static pod ne redémarre pas : bug de manifest → `journalctl -u kubelet` + `/var/log/pods/kube-system_kube-apiserver-*`.
-- Cert expiré : symptôme "x509: certificate has expired" dans les logs.
+- Cert expiré : symptôme `x509: certificate has expired or is not yet valid` dans les logs. → Vérifier : `kubeadm certs check-expiration`. Réparer : `kubeadm certs renew all` (ou un cert précis), puis **bouncer les static pods** (`mv /etc/kubernetes/manifests/*.yaml /tmp && sleep 20 && mv /tmp/*.yaml /etc/kubernetes/manifests/`). Enfin régénérer le kubeconfig admin si besoin (`kubeadm init phase kubeconfig admin` → recopier dans `$HOME/.kube/config`).
 
 ### DNS
-- CoreDNS `CrashLoopBackOff` avec `plugin/loop: Loop detected` → `resolv.conf` du node pointe sur lui-même.
-- Résolution qui fonctionne dans le namespace `default` mais pas ailleurs : vérifier `search` paths + `dnsPolicy`.
+- CoreDNS `CrashLoopBackOff` avec `plugin/loop: Loop detected` → le `resolv.conf` monté dans CoreDNS pointe sur un **résolveur local** (`127.0.0.53` = stub systemd-resolved, ou `127.0.0.1`) **au lieu d'un vrai DNS upstream** (ex. `8.8.8.8` ou le resolver du réseau). CoreDNS se forward donc à lui-même → boucle. Fix : dire au kubelet d'utiliser le vrai fichier (`--resolv-conf=/run/systemd/resolve/resolv.conf` au lieu de `/etc/resolv.conf`), puis restart CoreDNS.
+- Résolution qui fonctionne dans le namespace `default` mais pas ailleurs : vérifier les `search` paths (`/etc/resolv.conf` du Pod) + le `dnsPolicy` du Pod. `dnsPolicy` = quel resolver le Pod utilise : **`ClusterFirst`** (défaut → CoreDNS, résout les services K8s), `Default` (hérite du resolv.conf du **node**, ⚠️ pas le défaut malgré le nom, ne résout PAS les services), `ClusterFirstWithHostNet` (obligatoire si `hostNetwork: true`), `None` (serveurs fournis via `dnsConfig`). Un Pod qui ne résout aucun `*.svc.cluster.local` a souvent `dnsPolicy: Default`.
 
 ### Service sans trafic
 - `kubectl get ep <svc>` → vide = **selector mismatch** ou Pods `NotReady` (probes).
 - `externalTrafficPolicy: Local` avec 0 Pod sur le node reçu → drop.
 
 ### etcd
-- Snapshot **restore** fait sur **1 seul membre** puis nouveau cluster init. Ne pas restore sur un cluster à quorum encore actif.
+- Snapshot **restore** = écrit un **nouveau data-dir** sur disque (ne touche pas le cluster live) et y forge un **nouveau cluster ID**. Donc : restaurer dans un dossier neuf est OK, mais un membre restauré **ne peut pas rejoindre** un quorum encore vivant (cluster ID mismatch) et, s'il le pouvait, les membres restés à quorum **ré-écraseraient** sa donnée. → Il faut d'abord **arrêter l'ancien cluster** :
+  - **1 seul control plane (cas CKA)** : stop apiserver+etcd → `etcdctl snapshot restore snap.db --data-dir=/var/lib/etcd-restore` → repointer `--data-dir` (et le hostPath) dans le manifest static pod etcd → restart.
+  - **etcd HA (3 membres)** : arrêter **tous** les membres, restaurer **le même snapshot sur chacun** avec `--initial-cluster` / `--initial-cluster-token` cohérents, puis relancer les 3 = cluster reconstruit à neuf.
 - Après restore, il faut modifier le manifest static pod etcd pour pointer vers le nouveau `--data-dir`.
 
 ## 🔗 Docs officielles autorisées

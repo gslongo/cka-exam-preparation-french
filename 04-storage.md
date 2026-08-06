@@ -2,6 +2,26 @@
 
 > **CKA — 10 %** · Le domaine le plus léger en poids mais présent presque tout le temps à l'exam.
 
+<details>
+<summary>📑 Sommaire</summary>
+
+- [🎯 Objectifs de l'exam](#-objectifs-de-lexam)
+- [🧠 Concepts clés](#-concepts-clés)
+  - [Vue d'ensemble](#vue-densemble)
+  - [Volume types (essentiel pour l'exam)](#volume-types-essentiel-pour-lexam)
+  - [PVC — champs minimaux](#pvc--champs-minimaux)
+  - [Access modes](#access-modes)
+  - [Reclaim policies](#reclaim-policies)
+  - [Cycle de vie : workload vs stockage](#cycle-de-vie--workload-vs-stockage)
+  - [Binding & lifecycle](#binding--lifecycle)
+  - [Resize d'un PVC](#resize-dun-pvc)
+- [📋 Commandes essentielles](#-commandes-essentielles)
+- [📄 YAML de référence](#-yaml-de-référence)
+- [⚠️ Pièges fréquents](#️-pièges-fréquents)
+- [🔗 Docs officielles autorisées](#-docs-officielles-autorisées)
+
+</details>
+
 ## 🎯 Objectifs de l'exam
 
 - Comprendre le rôle et l'usage des **classes de stockage** (`StorageClass`)

@@ -2,6 +2,32 @@
 
 > **CKA — 20 %** · Services, Ingress, DNS, CNI, NetworkPolicy, kube-proxy modes.
 
+<details>
+<summary>📑 Sommaire</summary>
+
+- [🎯 Objectifs de l'exam](#-objectifs-de-lexam)
+- [🧠 Concepts clés](#-concepts-clés)
+  - [Le modèle réseau K8s (règles fondamentales)](#le-modèle-réseau-k8s-règles-fondamentales)
+  - [Types de Services](#types-de-services)
+  - [Endpoints & EndpointSlices](#endpoints--endpointslices)
+  - [kube-proxy — modes](#kube-proxy--modes)
+  - [DNS — CoreDNS](#dns--coredns)
+  - [Ingress](#ingress)
+  - [Gateway API (2024+)](#gateway-api-2024)
+  - [CNI plugins](#cni-plugins)
+  - [NetworkPolicy](#networkpolicy)
+- [📋 Commandes essentielles](#-commandes-essentielles)
+- [📄 YAML de référence](#-yaml-de-référence)
+- [⚠️ Pièges fréquents](#️-pièges-fréquents)
+  - [Services](#services)
+  - [DNS](#dns)
+  - [Ingress](#ingress-1)
+  - [NetworkPolicy](#networkpolicy-1)
+  - [kube-proxy](#kube-proxy)
+- [🔗 Docs officielles autorisées](#-docs-officielles-autorisées)
+
+</details>
+
 ## 🎯 Objectifs de l'exam
 
 - Comprendre la connectivité Pods (**modèle réseau plat**)

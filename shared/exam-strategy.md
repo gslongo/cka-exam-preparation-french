@@ -5,6 +5,29 @@
 > ⚠️ La dernière stable upstream (ex : 1.36) n'est PAS forcément la version exam. Toujours revérifier la date d'exam approchant : docs.linuxfoundation.org/tc-docs/certification/faq-cka-ckad
 > Format : 2 h · 15-20 tâches pratiques · **passage 66 %** · 1 retake gratuit · killer.sh (2 sessions 36 h).
 
+<details>
+<summary>📑 Sommaire</summary>
+
+- [🏆 Top 15 à savoir absolument](#-top-15-à-savoir-absolument)
+- [🧭 Comment lire le curriculum CNCF](#-comment-lire-le-curriculum-cncf)
+- [📅 Avant l'exam](#-avant-lexam)
+  - [J-30 à J-14](#j-30-à-j-14)
+  - [J-14 à J-7](#j-14-à-j-7)
+  - [J-7 à J-1](#j-7-à-j-1)
+  - [J-1](#j-1)
+- [🔖 Bookmarks à préparer](#-bookmarks-à-préparer)
+  - [Bookmarks essentiels](#bookmarks-essentiels)
+- [🧭 Méthode pendant l'exam](#-méthode-pendant-lexam)
+  - [Setup initial (30 s)](#setup-initial-30-s)
+  - [Pour CHAQUE question](#pour-chaque-question)
+  - [Priorisation en 2 h](#priorisation-en-2-h)
+  - [Erreurs qui coûtent cher](#erreurs-qui-coûtent-cher)
+- [🧪 Environnement PSI Bridge](#-environnement-psi-bridge)
+- [🧯 Si ça se passe mal](#-si-ça-se-passe-mal)
+- [📈 Après l'exam](#-après-lexam)
+
+</details>
+
 ## 🏆 Top 15 à savoir absolument
 
 > Synthèse priorisée (poids × fréquence × temps perdu si non maîtrisé). Le vrai tueur = **le temps**.
