@@ -13,7 +13,7 @@
 
 > 🎯 **Examens blancs auto-corrigés** : [exam-01](lab-setup/mock-exam/exam-01/EXAM.md) (intermédiaire) · [exam-02](lab-setup/mock-exam/exam-02/EXAM.md) (**avancé**) — 16 tâches chrono + correction `grade.sh`
 
-> 🧭 **Par où commencer selon ton niveau** : [parcours express](#-parcours-express-selon-ton-niveau) (profil « managé/cloud EKS·GKE·AKS » ou « K8s déjà avancé »)
+> 🧭 **Par où commencer selon ton niveau** : [parcours express](#-parcours-express-selon-ton-niveau) (« débutant complet », « managé/cloud EKS·GKE·AKS » ou « K8s déjà avancé »)
 
 ---
 
@@ -95,6 +95,21 @@ Dans chaque sujet : `EXAM.md` = **questions seules** · `solutions/SOLUTIONS.md`
 
 > Le CKA est un examen d'**administrateur** : il teste surtout ce que les offres managées **cachent** (control plane, `etcd`, static pods, `kubelet`, réseau bas niveau). Choisis ton point d'entrée selon ton profil.
 
+### 0️⃣ Tu pars de zéro (aucune notion Kubernetes)
+
+Avant l'admin, il faut les **fondations**. Objectif : comprendre *ce qu'est* Kubernetes et manipuler les objets de base **avant** d'attaquer la couche control plane.
+
+1. **Bases conteneurs d'abord** : assure-toi de comprendre **image / conteneur / registry** (Docker ou `nerdctl`). K8s orchestre des conteneurs — sans ce socle, tout le reste reste abstrait.
+2. **LFS158 — Introduction to Kubernetes** (edX, **gratuit**) : le cours d'entrée. Architecture (control plane vs nodes), Pods, vocabulaire. Garde le [glossaire](shared/glossary.md) ouvert en parallèle.
+3. **Fiche 01 en *lecture de découverte*** → [01-cluster-architecture.md](01-cluster-architecture.md) : repère les composants (`apiserver`, `etcd`, `scheduler`, `controller-manager`, `kubelet`, `kube-proxy`) et comment ils s'emboîtent. Ne cherche pas encore à tout retenir.
+4. **Monte le lab kubeadm tôt** → [lab-setup/README.md](lab-setup/README.md) : rien ne remplace un vrai cluster sous la main pour ancrer les concepts.
+5. **Objets de base**, dans l'ordre d'apprentissage : Pods → Deployments/ReplicaSets → Services → namespaces → ConfigMap/Secret. Fiches [02](02-workloads-scheduling.md) puis [03](03-services-networking.md).
+6. **Réflexes kubectl dès le départ** → [shared/kubectl-tips.md](shared/kubectl-tips.md) : `get`/`describe`/`logs`/`explain`, génération de YAML avec `--dry-run=client -o yaml`, alias `k`/`$do`/`$now`.
+7. **Puis Storage** [04](04-storage.md) **et Troubleshooting** [05](05-troubleshooting.md), une fois les objets de base assimilés.
+8. **Bascule ensuite sur le parcours 1️⃣** ci-dessous pour la mise en condition examen (le lab est déjà monté → tu gagnes du temps).
+
+> ⏱️ Compte plus de temps ici que sur les autres parcours : vise la **compréhension** avant la vitesse. Premier jalon concret = déployer un Pod + Service et lire leurs `describe`/`logs` sans hésiter.
+
 ### 1️⃣ Tu as déjà les notions K8s — ou tu ne bosses qu'en managé (EKS / GKE / AKS)
 
 Tu maîtrises `kubectl`, Deployments, Services… mais le managé t'a masqué la couche admin. **Comble ce delta d'abord** — c'est là que se joue l'examen.
@@ -120,7 +135,7 @@ Tu connais l'admin. Il te reste la **vitesse**, le **format** et quelques **méc
 5. **Rodage format** : **killer.sh** ×2 (plus dur que le vrai exam) + [shared/exam-strategy.md](shared/exam-strategy.md) (Top 15, alias, gestion des 2 h).
 6. **J-1** : [00-cheatsheet.md](00-cheatsheet.md) + [shared/yaml-snippets.md](shared/yaml-snippets.md).
 
-> 🔁 Les deux parcours convergent sur : **lab kubeadm → examen blanc chronométré → killer.sh**. La couche admin (fiche 01) + le troubleshooting (fiche 05) pèsent **55 %** de la note : c'est là qu'un profil « managé » gagne le plus de points.
+> 🔁 Les trois parcours convergent sur : **lab kubeadm → examen blanc chronométré → killer.sh**. La couche admin (fiche 01) + le troubleshooting (fiche 05) pèsent **55 %** de la note : c'est là qu'un profil « managé » gagne le plus de points.
 
 ## 🗓️ Planning de révision (indicatif)
 
