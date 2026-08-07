@@ -74,6 +74,8 @@ graph LR
 > 💡 **`kubectl proxy`** (≠ type de Service) : proxy local authentifié vers l'API pour joindre un ClusterIP depuis l'extérieur sans l'exposer → `http://localhost:8001/api/v1/namespaces/<ns>/services/<svc>:<port>/proxy/`. Debug/dev uniquement.
 >
 > Le **range** des ClusterIP est fixé au démarrage de l'apiserver via `--service-cluster-ip-range` ; celui des **NodePort** (`30000-32767` par défaut) via `--service-node-port-range`.
+>
+> ⚠️ Ces ranges sont **lus au boot de l'apiserver** et **pas modifiables à chaud** : les changer après coup est disruptif (les Services déjà alloués **gardent** leur IP, `kube-controller-manager` doit porter le même flag → incohérences). Depuis **1.33** (`MultiCIDRServiceAllocator` GA) on peut **étendre** la plage ClusterIP en créant des objets `ServiceCIDR` (sans restart), mais on ne **change/rétrécit pas** la plage d'origine.
 
 #### Anatomie d'un Service `NodePort` (piège classique)
 
@@ -107,7 +109,7 @@ Un Service `type: NodePort` cumule **3 niveaux** :
 
 ### Endpoints & EndpointSlices
 
-- Un Service `matchLabels` → **Endpoints** (liste d'IPs de Pods `Ready`)
+- Le **`spec.selector`** d'un Service matche des Pods par labels → le control plane génère automatiquement les **Endpoints** (liste des IP:port des Pods `Ready` du selector)
 - Depuis 1.21, **EndpointSlices** (`discovery.k8s.io/v1`) = découpage en slices pour scalabilité. L'objet **`Endpoints` (v1) est désormais déprécié** (toujours supporté/lu, mais préférer EndpointSlice ; `kubectl get ep` reste OK pour un debug rapide).
 - Un Pod `Not Ready` n'apparaît pas dans les endpoints (donc pas de trafic)
 
@@ -149,6 +151,15 @@ kubectl debug -it <pod> --image=nicolaka/netshoot --target=<container> -- ss -lt
 > - Debug backends : `sudo ipvsadm -Ln` (ipvs) vs `sudo iptables-save | grep <clusterip>` (iptables).
 
 > 💡 **`spec.trafficDistribution`** (Service, topology-aware routing, GA 1.33) : route le trafic vers l'endpoint le plus proche. Valeur `PreferClose` **renommée `PreferSameZone`** en 1.34 (+ ajout `PreferSameNode`) ; `PreferClose` déprécié mais conservé comme alias. Sert à réduire la latence / les coûts inter-zones (utile côté EKS multi-AZ).
+>
+> **Exemple** — Service `web` avec des Pods dans `zone-a` et `zone-b` (cluster multi-AZ) :
+> ```yaml
+> spec:
+>   selector: { app: web }
+>   trafficDistribution: PreferSameZone   # (PreferClose avant 1.34)
+>   ports: [{ port: 80 }]
+> ```
+> Un client dans `zone-a` → kube-proxy l'envoie vers un Pod de **`zone-a`** (pas de saut inter-AZ). Si `zone-a` n'a **aucun** endpoint `Ready`, il **retombe** sur les autres zones (best-effort, pas un hard-cut). Sans ce champ, le round-robin ignore la zone → moitié du trafic part en cross-AZ (latence + facturation transfert).
 
 ### DNS — CoreDNS
 
@@ -177,6 +188,8 @@ kubectl debug -it <pod> --image=nicolaka/netshoot --target=<container> -- ss -lt
 - `Pod.spec.dnsPolicy` : `ClusterFirst` (défaut), `Default` (utilise resolv.conf du node), `None` (+ `dnsConfig` custom)
 
 ### Ingress
+
+Un **Ingress** = objet API K8s qui définit des **règles de routage HTTP/HTTPS L7** (par `host` et/ou `path`) pour exposer **plusieurs Services** derrière **une seule** entrée externe. Il remplace le pattern « 1 Service `LoadBalancer` par app » (coûteux : 1 IP publique chacun) par **1 point d'entrée mutualisé** qui aiguille selon l'URL. ⚠️ C'est une **spec déclarative inerte** : elle ne route rien toute seule — un **Ingress Controller** (Pod nginx/Traefik/… qui *lit* ces objets et configure un vrai reverse proxy) doit tourner dans le cluster. Ingress = les *règles*, Controller = le *moteur* qui les applique.
 
 ```mermaid
 graph LR
@@ -238,11 +251,36 @@ graph TB
 
 ### Gateway API (2024+)
 
+La **Gateway API** = nouvel ensemble d'objets (CRDs) pour le routage d'entrée L4/L7, conçu comme **successeur d'Ingress**. **Ce que c'est** : au lieu d'un objet `Ingress` monolithique + une forêt d'annotations vendor, elle **éclate le routage en plusieurs ressources à responsabilités séparées** (`GatewayClass` / `Gateway` / `*Route`). **Comment ça marche** : une **implémentation** (NGINX GF, Istio, cloud…) tourne dans le cluster et watch ces objets ; un `Gateway` déclare des **listeners** (port + protocole + TLS = la porte d'entrée), et des `HTTPRoute`/`GRPCRoute`/`TCPRoute` **attachés** au Gateway (`parentRefs`) portent les règles `host`/`path`/`header` → `backendRefs` vers des Services. L'implémentation traduit tout ça en config de proxy réel.
+
+**Différences clés avec Ingress** :
+
+| Aspect | Ingress | Gateway API |
+|---|---|---|
+| Modèle | 1 objet unique | **rôles séparés** : `GatewayClass` (admin) / `Gateway` (platform) / `*Route` (dev) |
+| Protocoles | HTTP/HTTPS L7 seulement | **HTTP, gRPC, TCP, UDP, TLS** (L4+L7) |
+| Routing avancé (header, query, canary/poids) | via **annotations vendor** (non portable) | **natif dans la spec** (`matches`, `backendRefs[].weight`) |
+| Cross-namespace | non | oui, via **`ReferenceGrant`** |
+| Portabilité | annotations propres à chaque controller | **API standard**, expressive, portable |
+| API group | `networking.k8s.io/v1` | `gateway.networking.k8s.io/v1` |
+
+> 🔑 En clair : Ingress = *une boîte HTTP figée qu'on étend par annotations* ; Gateway API = *un modèle extensible, multi-protocole et multi-rôles* qui met le routing avancé **dans la spec** plutôt que chez le vendor.
+
+**Les `Kind` standard** :
+
+| Kind | Scope | Rôle | Créé par |
+|---|---|---|---|
+| `GatewayClass` | **Cluster** | Type d'implémentation (`spec.controllerName`) — comme `IngressClass` | Admin |
+| `Gateway` | Namespacé | La « front door » : `listeners` (port + protocole + TLS) | Platform |
+| `HTTPRoute` | Namespacé | Règles HTTP L7 (`host`/`path`/`header` → `backendRefs`) | Dev |
+| `GRPCRoute` | Namespacé | Idem pour le trafic **gRPC** | Dev |
+| `ReferenceGrant` | Namespacé | Autorise un `*Route` à référencer un backend d'**un autre namespace** | Owner du NS cible |
+
+> `TCPRoute`/`UDPRoute`/`TLSRoute` existent aussi mais restent en canal **expérimental** (hors « standard channel »).
+
 - Successeur d'Ingress, **GA en 1.31** (pour `Gateway`, `HTTPRoute`, `GatewayClass`)
 - **API group** : `gateway.networking.k8s.io/v1` (⚠️ ≠ Ingress `networking.k8s.io/v1` — piège d'`apiVersion`).
-- **Kinds standard** (5) : `GatewayClass`, `Gateway`, `HTTPRoute`, `GRPCRoute`, `ReferenceGrant` (ce dernier = autorise un `*Route` à référencer un backend dans **un autre namespace**).
-- Séparation des rôles : `GatewayClass` (admin), `Gateway` (platform), `HTTPRoute` (dev)
-- **`GatewayClass`** : **cluster-scoped** (comme `IngressClass`/`StorageClass`). Champ clé `spec.controllerName` = l'implémentation (ex. `example.com/gateway-controller`). Équivaut à `spec.controller` d'`IngressClass`. Créé par l'admin ; le dev ne fait que le référencer depuis un `Gateway`.
+- **`GatewayClass`** : champ clé `spec.controllerName` = l'implémentation (ex. `example.com/gateway-controller`). Équivaut à `spec.controller` d'`IngressClass`. Créé par l'admin ; le dev ne fait que le référencer depuis un `Gateway`.
 - **`Gateway`** : **namespacé**, la « front door ». Champ `spec.gatewayClassName` → référence la `GatewayClass`. Définit les **`listeners`** (`protocol` HTTP/HTTPS/TCP + `port`, TLS termination).
 - **`HTTPRoute`** : **namespacé** (dev). `parentRefs` → Gateway, `hostnames`, `rules[].matches` (path **+ headers + query**) + `rules[].backendRefs[].name/port` → Service. ⚠️ Match path = **`matches[].path.type: PathPrefix`** (valeurs `Exact`/`PathPrefix`/`RegularExpression`) — **≠** Ingress `pathType: Prefix` (mot + champ différents). Canary natif via `backendRefs[].weight` (plus d'annotation vendor).
 - CKA v1.35 : **Ingress toujours attendu**, mais le cours fait désormais Gateway API **en hands-on** (NGINX Gateway Fabric). Structure : `Gateway` (listeners: port/protocol) + `HTTPRoute` (`parentRefs` → le Gateway, `hostnames`, `rules` avec `backendRefs` → Service). Officiellement borderline, mais monte en importance.
@@ -302,6 +340,52 @@ graph TB
   - `namespaceSelector` : namespaces cibles
   - `ipBlock` : CIDR (utile pour egress externe)
 - Les selectors acceptent `matchLabels` **ou** `matchExpressions` (opérateurs `In`/`NotIn`/`Exists`/`DoesNotExist`) — même syntaxe que partout ailleurs.
+
+**Exemple — micro-segmentation 3-tiers** (`web` → `api` → `db`) : on veut que `web` parle à `api`, que `api` parle à `db`, mais que `web` **ne joigne jamais `db` directement**.
+
+```mermaid
+graph LR
+    W["Pod web<br/>app=web"] -->|✅ autorisé| A["Pod api<br/>app=api"]
+    A -->|✅ autorisé| D["Pod db<br/>app=db"]
+    W -.->|❌ bloqué| D
+```
+
+On pose **une policy ingress par tier** : chacune, en sélectionnant son Pod, bascule ce tier en **deny-by-default** et ne rouvre que la source légitime.
+
+```yaml
+# 1) api n'accepte que web (port 8080)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: api-allow-web, namespace: prod }
+spec:
+  podSelector: { matchLabels: { app: api } }    # cible = Pods api
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - podSelector: { matchLabels: { app: web } } # seule source autorisée
+    ports: [{ port: 8080, protocol: TCP }]
+---
+# 2) db n'accepte que api (port 5432)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: db-allow-api, namespace: prod }
+spec:
+  podSelector: { matchLabels: { app: db } }     # cible = Pods db
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - podSelector: { matchLabels: { app: api } } # seule source autorisée
+    ports: [{ port: 5432, protocol: TCP }]
+```
+
+> 💡 `web → db` tombe **sans règle qui le matche** → **droppé** : la policy `db-allow-api` sélectionne `db`, donc tout ce qui n'est pas `app=api` est deny-by-default. Idem `db → api` (aucune règle ingress sur `api` pour `db`). Aucune policy « deny » explicite n'est nécessaire. Vérifier :
+> ```bash
+> kubectl exec web -- nc -zv db 5432    # ❌ timeout (bloqué)
+> kubectl exec api -- nc -zv db 5432    # ✅ ok
+> kubectl exec web -- nc -zv api 8080   # ✅ ok
+> ```
+> ⚠️ Ici on ne gère que l'**Ingress**. Si `web`/`api` sont aussi sélectionnés par une policy **Egress** (ou une baseline egress-deny), il faut penser à **rouvrir UDP/53 vers CoreDNS** sinon la résolution DNS casse avant même la connexion TCP.
+
 
 ## 📋 Commandes essentielles
 

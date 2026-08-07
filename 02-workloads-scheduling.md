@@ -786,6 +786,7 @@ spec:
 - `--record` (rolling updates) : **deprecated depuis 1.15**, absent des exemples officiels 2024+. Ne pas l'utiliser à l'exam CKA. Alternatives :
   - `kubectl annotate deploy/web kubernetes.io/change-cause="upgrade nginx 1.26" --overwrite`
   - Ou baker l'annotation directement dans le manifest
+  > 💡 `kubernetes.io/change-cause` = annotation **standard réservée** (préfixe `kubernetes.io/`/`k8s.io/` réservé au core), **lue par `kubectl`** → alimente la colonne `CHANGE-CAUSE` de `rollout history`. Nom + sémantique fixes ; ne pas inventer d'autres clés sous ce préfixe (utiliser `ton-domaine.com/...`).
   > ⚠️ L'ancien cours LFS158 le présente encore comme "valuable" → **contenu daté**.
 
 ### StatefulSet
