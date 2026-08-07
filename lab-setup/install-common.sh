@@ -1,12 +1,21 @@
 #!/usr/bin/env bash
-# install-common.sh — runtime + kubeadm sur tous les nodes (Ubuntu 22.04, K8s 1.35)
+# install-common.sh — runtime + kubeadm sur tous les nodes (Ubuntu 22.04, K8s 1.34)
 set -euxo pipefail
 
-K8S_MINOR="1.35"
+# On installe volontairement 1.34 (et PAS 1.35, la version exam) : le cluster est
+# initialisé en 1.34 pour pouvoir s'entraîner à l'upgrade kubeadm 1.34 → 1.35
+# (compétence CKA « Cluster Architecture »). Passer à "1.35" ici pour partir direct
+# en version exam sans exercice d'upgrade.
+K8S_MINOR="1.34"
 
 # --- 1. Prérequis kernel + sysctl ---
+# Swap OFF de façon *persistante au reboot* : la box bento a une ligne fstab
+# séparée par des TABS (`/swap.img\tnone\tswap ...`) → commenter avec [[:space:]]
+# (pas un espace littéral, sinon le sed rate la ligne et swap revient au reboot,
+# ce qui fait crasher kubelet : "running with swap on is not supported").
 swapoff -a
-sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+sed -ri '/^[^#]*[[:space:]]swap[[:space:]]/ s/^/#/' /etc/fstab
+systemctl mask swap.img.swap 2>/dev/null || true   # empêche la ré-activation par systemd
 
 cat > /etc/modules-load.d/k8s.conf <<EOF
 overlay
@@ -32,7 +41,7 @@ sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.to
 systemctl restart containerd
 systemctl enable containerd
 
-# --- 3. Repo Kubernetes 1.35 ---
+# --- 3. Repo Kubernetes (pinné sur ${K8S_MINOR}) ---
 mkdir -p /etc/apt/keyrings
 curl -fsSL "https://pkgs.k8s.io/core:/stable:/v${K8S_MINOR}/deb/Release.key" \
   | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg

@@ -1,7 +1,7 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 #
-# Cluster CKA — 1 CP + 2 workers, K8s 1.35, Calico
+# Cluster CKA — 1 CP + 2 workers, K8s 1.34 (upgrade → 1.35 à pratiquer), Calico
 # Usage : vagrant up --no-parallel
 
 Vagrant.configure("2") do |config|

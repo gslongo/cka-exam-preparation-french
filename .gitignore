@@ -30,6 +30,8 @@ Thumbs.db
 # Artefacts Vagrant (si tu lances les VM depuis lab-setup/)
 # ─────────────────────────────────────────────────────────────
 .vagrant/
+# généré par `vagrant up` (contient un token de join kubeadm) — ne jamais committer
+lab-setup/join-command.sh
 
 # ─────────────────────────────────────────────────────────────
 # Mémoire agent (si présente dans le repo)

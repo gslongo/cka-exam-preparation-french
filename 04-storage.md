@@ -303,7 +303,7 @@ spec:
 ## ⚠️ Pièges fréquents
 
 - **PVC `Pending`** : dans l'ordre — StorageClass inexistante / pas de défaut ? `accessModes` incompatible ? Capacity du PV insuffisante ? Zone/topology contrainte ?
-- **PV `Released` bloqué** : reclaim `Retain` → il faut `kubectl edit pv <name>` et retirer `spec.claimRef` pour le rendre `Available` à nouveau.
+- **PV `Released` bloqué** : `spec.claimRef` = le **pointeur du PV vers son PVC** (namespace + name + `uid`) → c'est lui qui matérialise le binding. En reclaim `Retain`, supprimer le PVC laisse ce `claimRef` **rempli** (avec un `uid` qui ne correspond plus à aucun PVC) → PV coincé en `Released`, **pas** rebindable même si tu recrées un PVC de même nom. Fix : `kubectl edit pv <name>` et **retirer le bloc `spec.claimRef`** → repasse `Available`. (Alt. one-liner : `kubectl patch pv <name> --type=json -p '[{"op":"remove","path":"/spec/claimRef"}]'`.) ⚠️ Les **données restent** sur le volume ; pour repartir propre, nettoyer le backend d'abord. À l'inverse, **pré-remplir** un `claimRef` sur un PV = le **réserver** à un PVC précis (binding statique dirigé).
 - **Modifier `storageClassName` d'un PVC = interdit** (champ immutable). Recréer.
 - **`storageClassName: ""`** ≠ absence : `""` force un binding statique (pas de dynamic).
 - **`volumeMounts.subPath`** utile pour monter **un fichier** de ConfigMap/Secret sans écraser le dossier, mais casse la mise à jour dynamique du ConfigMap.

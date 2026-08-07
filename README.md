@@ -11,6 +11,10 @@
 
 > 🏆 **Stratégie & Top 15** : [shared/exam-strategy.md](shared/exam-strategy.md) (méthode, timing, bookmarks, PSI)
 
+> 🎯 **Examens blancs auto-corrigés** : [exam-01](lab-setup/mock-exam/exam-01/EXAM.md) (intermédiaire) · [exam-02](lab-setup/mock-exam/exam-02/EXAM.md) (**avancé**) — 16 tâches chrono + correction `grade.sh`
+
+> 🧭 **Par où commencer selon ton niveau** : [parcours express](#-parcours-express-selon-ton-niveau) (profil « managé/cloud EKS·GKE·AKS » ou « K8s déjà avancé »)
+
 ---
 
 ## 🗺️ Arborescence
@@ -37,12 +41,13 @@ CKA/                              ← workspace (ce dossier)
 │   ├── yaml-snippets.md
 │   ├── exam-strategy.md
 │   └── glossary.md
-└── lab-setup/                    ← cluster kubeadm local (Vagrant, K8s 1.35)
+└── lab-setup/                    ← cluster kubeadm local (Vagrant, K8s 1.34 → upgrade 1.35)
     ├── README.md
     ├── Vagrantfile
     ├── install-common.sh
     ├── init-cp.sh
-    └── join-worker.sh
+    ├── join-worker.sh
+    └── mock-exam/                 ← examens blancs auto-corrigés (un dossier par sujet : exam-01/, exam-02/)
 ```
 
 ## 🧰 Ressources transverses
@@ -54,7 +59,25 @@ CKA/                              ← workspace (ce dossier)
 - [shared/kubectl-tips.md](shared/kubectl-tips.md) — réflexes kubectl, alias, JSONPath
 - [shared/yaml-snippets.md](shared/yaml-snippets.md) — YAML types prêts à copier
 - [shared/glossary.md](shared/glossary.md) — glossaire des termes K8s
-- [lab-setup/README.md](lab-setup/README.md) — monter un cluster kubeadm local (Vagrant, K8s 1.35)
+- [lab-setup/README.md](lab-setup/README.md) — monter un cluster kubeadm local (Vagrant, init K8s 1.34 → upgrade 1.35 à pratiquer, objectif version exam)
+- [lab-setup/mock-exam/exam-01/EXAM.md](lab-setup/mock-exam/exam-01/EXAM.md) — examen blanc auto-corrigé, niveau intermédiaire (16 tâches, `setup.sh` + `grade.sh`)
+- [lab-setup/mock-exam/exam-02/EXAM.md](lab-setup/mock-exam/exam-02/EXAM.md) — examen blanc auto-corrigé, **niveau avancé** (RBAC cluster-scoped, taints, NetworkPolicy default-deny, `subPath`…)
+
+## 🎯 Examens blancs CKA
+
+Deux examens blancs complets **auto-corrigés** tournent sur le [lab local](lab-setup/README.md) : **16 tâches, 100 pts, seuil 66 %, ~2 h** chacun, pondérés par domaine comme le vrai CKA (Troubleshooting 30 % · Cluster Architecture 25 % · Réseau 20 % · Workloads 15 % · Storage 10 %). Chaque sujet vit dans son sous-dossier.
+
+- **exam-01** — niveau intermédiaire : RBAC namespacé, snapshot etcd, static pod, cordon, ConfigMap→env, NodePort, NetworkPolicy simple, PV/PVC…
+- **exam-02** — **niveau avancé** : RBAC *cluster-scoped*, scheduling manuel, taints/tolerations, Secret→env, NetworkPolicy *default-deny*, `reclaimPolicy`/`subPath`, troubleshooting moins évident (sonde, dérive de labels, contrainte de placement, Secret manquant).
+
+| Sujet | Fichiers |
+|---|---|
+| **exam-01** (intermédiaire) | [EXAM.md](lab-setup/mock-exam/exam-01/EXAM.md) · [solutions/SOLUTIONS.md](lab-setup/mock-exam/exam-01/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/mock-exam/exam-01/setup.sh) · [grade.sh](lab-setup/mock-exam/exam-01/grade.sh) |
+| **exam-02** (avancé) | [EXAM.md](lab-setup/mock-exam/exam-02/EXAM.md) · [solutions/SOLUTIONS.md](lab-setup/mock-exam/exam-02/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/mock-exam/exam-02/setup.sh) · [grade.sh](lab-setup/mock-exam/exam-02/grade.sh) |
+
+Dans chaque sujet : `EXAM.md` = **questions seules** · `solutions/SOLUTIONS.md` = corrigé (à n'ouvrir **qu'après**) · `setup.sh` = amorce **idempotente** · `grade.sh` = correcteur **automatique** (score /100 + verdict par domaine).
+
+> ▶️ **Mode d'emploi** (commandes `vagrant`) : voir [lab-setup/README.md](lab-setup/README.md).
 
 ## 📚 Domaines & pondération CKA (curriculum CNCF)
 
@@ -67,6 +90,37 @@ CKA/                              ← workspace (ce dossier)
 | 5 | Troubleshooting | **30 %** | [05-troubleshooting.md](05-troubleshooting.md) |
 
 > 💡 Priorité de révision = **05 > 01 > 03 > 02 > 04** (ordre de poids décroissant).
+
+## 🧭 Parcours express selon ton niveau
+
+> Le CKA est un examen d'**administrateur** : il teste surtout ce que les offres managées **cachent** (control plane, `etcd`, static pods, `kubelet`, réseau bas niveau). Choisis ton point d'entrée selon ton profil.
+
+### 1️⃣ Tu as déjà les notions K8s — ou tu ne bosses qu'en managé (EKS / GKE / AKS)
+
+Tu maîtrises `kubectl`, Deployments, Services… mais le managé t'a masqué la couche admin. **Comble ce delta d'abord** — c'est là que se joue l'examen.
+
+1. **Monte le lab kubeadm** → [lab-setup/README.md](lab-setup/README.md). LE différenciateur : tu touches enfin le control plane, `etcd`, les static pods, le `kubelet`.
+2. **Fiche 01 — Cluster Architecture** en priorité absolue → [01-cluster-architecture.md](01-cluster-architecture.md) : `kubeadm` init/upgrade, **etcd backup/restore**, RBAC, kubeconfig, static pods (≈ tout ce que le cloud gère à ta place).
+3. **Fiche 05 — Troubleshooting** → [05-troubleshooting.md](05-troubleshooting.md) : logs, events, `crictl`, node/`kubelet` down, certificats. **30 %** de l'exam.
+4. **Fiche 03 — Services & Networking** → [03-services-networking.md](03-services-networking.md) : CNI, `kube-proxy`, **NetworkPolicy**, Ingress — le réseau « à la main », pas le load-balancer managé.
+5. **Révision rapide** de ce que tu connais déjà : [02-workloads-scheduling.md](02-workloads-scheduling.md) + [04-storage.md](04-storage.md).
+6. **Vitesse** : [00-cheatsheet.md](00-cheatsheet.md) + [shared/kubectl-tips.md](shared/kubectl-tips.md) (alias `k`, `$do`, `$now`, JSONPath).
+7. **Passe l'[examen blanc exam-01](lab-setup/mock-exam/exam-01/EXAM.md)** en conditions réelles (chrono 2 h, correction auto `grade.sh`), puis enchaîne sur l'[exam-02 avancé](lab-setup/mock-exam/exam-02/EXAM.md) quand tu passes l'intermédiaire.
+8. **Drills** : [DOMAIN-REVIEW-CHECKLIST.md](DOMAIN-REVIEW-CHECKLIST.md) (50 tâches) puis **killer.sh** ×2.
+9. **J-1** : [shared/exam-strategy.md](shared/exam-strategy.md) (timing, bookmarks, PSI) + [PIEGES-EXAMEN.md](PIEGES-EXAMEN.md).
+
+### 2️⃣ Tu as déjà un niveau K8s avancé
+
+Tu connais l'admin. Il te reste la **vitesse**, le **format** et quelques **mécaniques CKA** à rendre réflexes.
+
+1. **Diagnostic** : attaque directement l'[examen blanc exam-02 avancé](lab-setup/mock-exam/exam-02/EXAM.md) en < 2 h (ou l'[exam-01](lab-setup/mock-exam/exam-01/EXAM.md) pour te caler d'abord sur le format). Le `grade.sh` sort un score /100 **par domaine** → tes trous sont là.
+2. **Comble ciblé** les domaines ratés via les fiches concernées ([01](01-cluster-architecture.md) → [05](05-troubleshooting.md)) + [QUESTIONS-EXAMEN.md](QUESTIONS-EXAMEN.md) + [PIEGES-EXAMEN.md](PIEGES-EXAMEN.md).
+3. **Automatise les mécaniques CKA** sur le [lab](lab-setup/README.md) jusqu'au réflexe : **etcd backup/restore**, **kubeadm upgrade**, static pods, RBAC, `cordon`/`drain`. → [00-cheatsheet.md](00-cheatsheet.md).
+4. **Drills chrono** : [DOMAIN-REVIEW-CHECKLIST.md](DOMAIN-REVIEW-CHECKLIST.md) — vise la vitesse d'exécution, pas la découverte.
+5. **Rodage format** : **killer.sh** ×2 (plus dur que le vrai exam) + [shared/exam-strategy.md](shared/exam-strategy.md) (Top 15, alias, gestion des 2 h).
+6. **J-1** : [00-cheatsheet.md](00-cheatsheet.md) + [shared/yaml-snippets.md](shared/yaml-snippets.md).
+
+> 🔁 Les deux parcours convergent sur : **lab kubeadm → examen blanc chronométré → killer.sh**. La couche admin (fiche 01) + le troubleshooting (fiche 05) pèsent **55 %** de la note : c'est là qu'un profil « managé » gagne le plus de points.
 
 ## 🗓️ Planning de révision (indicatif)
 

@@ -1,4 +1,4 @@
-# 🧪 Lab setup — Cluster kubeadm local (K8s 1.35)
+# 🧪 Lab setup — Cluster kubeadm local (K8s 1.34 → upgrade 1.35)
 
 > Provisionnement automatique d'un cluster **1 CP + 2 workers** sur ta machine hôte via Vagrant/VirtualBox. Reproduit l'environnement de l'exam CKA (kubeadm, containerd, Calico), impossible à tester sur EKS.
 
@@ -28,9 +28,9 @@ vagrant ssh cp1
 # --- dans la VM cp1 ---
 kubectl get nodes
 # NAME   STATUS   ROLES           AGE   VERSION
-# cp1    Ready    control-plane   5m    v1.35.x
-# w1     Ready    <none>          3m    v1.35.x
-# w2     Ready    <none>          3m    v1.35.x
+# cp1    Ready    control-plane   5m    v1.34.x   ← init en 1.34 (upgrade vers 1.35 à pratiquer)
+# w1     Ready    <none>          3m    v1.34.x
+# w2     Ready    <none>          3m    v1.34.x
 
 kubectl get pods -A          # tout Running (calico, coredns, kube-*)
 ```
@@ -56,6 +56,27 @@ vagrant snapshot save clean
 vagrant snapshot restore clean
 ```
 
+## 📝 Examen blanc CKA
+
+Le dossier [mock-exam/](mock-exam/) contient les examens blancs **auto-corrigés** (16 tâches, 100 pts, seuil 66 %, ~2 h chacun), un sous-dossier par sujet : [exam-01/](mock-exam/exam-01/) (intermédiaire) et [exam-02/](mock-exam/exam-02/) (**avancé**). Vue d'ensemble, pondération et liste des fichiers : voir le [README général](../README.md). Ici, le **mode d'emploi** sur le lab (remplace `exam-01` par `exam-02` pour le sujet avancé) :
+
+```bash
+# 1. Préparer l'environnement (sur cp1, via le dossier synchronisé /vagrant)
+vagrant ssh cp1 -c "bash /vagrant/mock-exam/exam-01/setup.sh"
+
+# 2. Composer ~2 h sur le cluster en suivant mock-exam/exam-01/EXAM.md
+#    (la plupart des tâches sur cp1 ; la tâche « static pod » se traite sur w1)
+
+# 3. Se corriger
+vagrant ssh cp1 -c "bash /vagrant/mock-exam/exam-01/grade.sh"
+
+# 4. Recommencer à zéro (ré-amorce l'état de départ)
+vagrant ssh cp1 -c "bash /vagrant/mock-exam/exam-01/setup.sh"
+```
+
+> 💡 `setup.sh` (lancé sur cp1) nettoie les namespaces d'exam, le PV, le label de `w1`, dé-cordonne les workers et supprime le snapshot etcd. Le **static pod** vit sur le disque de `w1` : pour repartir propre, le retirer à la main → `vagrant ssh w1 -c "sudo rm -f /etc/kubernetes/manifests/static-web.yaml"`.
+> Aucun `vagrant destroy` n'est requis pour ces examens (tout se joue au niveau des objets K8s) ; pour l'**exam-02**, `setup.sh` retire en plus le taint de `w1` et le ClusterRole/Binding créés.
+
 ## Reset complet du cluster K8s (sans détruire les VMs)
 
 Sur cp1 puis chaque worker :
@@ -72,7 +93,7 @@ Puis relancer `sudo /vagrant/init-cp.sh` puis `sudo /vagrant/join-worker.sh` (wo
 |---|---|---|
 | **Ubuntu** | 22.04 LTS (bento box) | OS |
 | **containerd** | apt Ubuntu (~1.7) | Container runtime CRI |
-| **Kubernetes** | 1.35.x | kubeadm + kubelet + kubectl (= version exam CKA) |
+| **Kubernetes** | 1.34.x | kubeadm + kubelet + kubectl — **init en 1.34** pour pratiquer l'upgrade → 1.35 (version exam CKA) |
 | **Calico** | v3.28.1 (via tigera-operator) | CNI + NetworkPolicy (**pas dispo sur EKS/VPC CNI par défaut**) |
 | **CIDR Pods** | `10.244.0.0/16` | — |
 | **CIDR Services** | `10.96.0.0/12` (défaut) | — |
@@ -89,7 +110,7 @@ Puis relancer `sudo /vagrant/init-cp.sh` puis `sudo /vagrant/join-worker.sh` (wo
 
 - **`vagrant up` sans `--no-parallel`** : les workers essaient de join avant que cp1 n'ait généré le token → échec. Utiliser `--no-parallel` la première fois.
 - **Réseau host-only VirtualBox** : sur macOS récent, il faut autoriser VirtualBox dans Réglages Système > Confidentialité et Sécurité après la 1re install.
-- **Swap** : désactivé automatiquement par le script (K8s 1.35 supporte swap mais off = plus simple).
+- **Swap** : désactivé automatiquement par le script (K8s 1.34+ supporte swap mais off = plus simple).
 - **Ubuntu box GPG issue** : si `apt-get update` échoue à cause d'une clé, `vagrant reload --provision` suffit généralement.
 
 ## Rebuild du cluster from scratch
