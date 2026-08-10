@@ -20,18 +20,19 @@ kubectl taint node w1 dedicated- >/dev/null 2>&1 || true
 kubectl label node w1 disktype- >/dev/null 2>&1 || true
 kubectl label node w2 disktype- >/dev/null 2>&1 || true
 kubectl uncordon w1 w2 >/dev/null 2>&1 || true
-sudo rm -f /opt/etcd-backup.db 2>/dev/null || true
 
 # Attendre la vraie disparition des namespaces (finalizers) avant recréation
 for ns in platform apps secure storage trouble; do
   kubectl wait --for=delete ns/$ns --timeout=120s >/dev/null 2>&1 || true
 done
 
-echo "📦 etcd-client (pour l'exo snapshot)…"
-if ! command -v etcdctl >/dev/null 2>&1; then
-  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y etcd-client >/dev/null 2>&1 \
-    && echo "   etcdctl installé" || echo "   ⚠️ install etcd-client KO (réseau ?) — l'exo etcd reste faisable via le pod etcd"
-fi
+# Avertir si le cluster a déjà été upgradé par une T2 précédente (irréversible)
+cpver=$(kubectl get node cp1 -o jsonpath='{.status.nodeInfo.kubeletVersion}' 2>/dev/null)
+case "$cpver" in
+  v1.34.*) : ;;  # état de départ attendu
+  v1.35.*) echo "⚠️ cp1 est déjà en $cpver : la T2 (upgrade) a déjà été jouée. Pour rejouer l'examen, redéploie le cluster : vagrant destroy -f && vagrant up --no-parallel" ;;
+  *) echo "ℹ️  version cp1 = ${cpver:-inconnue}" ;;
+esac
 
 echo "🌱 Création des namespaces…"
 for ns in platform apps secure storage trouble; do
@@ -105,26 +106,17 @@ spec:
           periodSeconds: 5
 EOF
 
-# T14 — Service sans endpoints (selector ≠ labels des pods)
+# T14 — Résolution DNS cassée (dnsConfig vers un serveur injoignable)
 kubectl -n trouble apply -f - >/dev/null <<EOF
-apiVersion: apps/v1
-kind: Deployment
-metadata: { name: store, namespace: trouble }
-spec:
-  replicas: 2
-  selector: { matchLabels: { app: store-v2 } }
-  template:
-    metadata: { labels: { app: store-v2 } }   # les pods portent app=store-v2
-    spec:
-      containers:
-      - { name: web, image: ${GOOD_IMG}, ports: [{ containerPort: 80 }] }
----
 apiVersion: v1
-kind: Service
-metadata: { name: store-svc, namespace: trouble }
+kind: Pod
+metadata: { name: dns-check, namespace: trouble, labels: { app: dns-check } }
 spec:
-  selector: { app: store }          # BUG : aucun pod ne porte app=store
-  ports: [{ port: 80, targetPort: 80 }]
+  dnsPolicy: None
+  dnsConfig:
+    nameservers: ["192.0.2.53"]   # BUG : serveur DNS injoignable (TEST-NET RFC 5737) → aucune résolution
+  containers:
+  - { name: c, image: ${BUSYBOX}, command: ["sh","-c","sleep 100000"] }
 EOF
 
 # T15 — Pod Pending (contrainte de placement impossible)

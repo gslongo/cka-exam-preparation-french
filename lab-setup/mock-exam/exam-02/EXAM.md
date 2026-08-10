@@ -2,7 +2,7 @@
 
 > **Format réel CKA** : 2 h · tâches pratiques · **passage 66 %** · barème pondéré ci-dessous.
 > Environnement : le cluster du lab (`cp1` + `w1` + `w2`, K8s 1.34, Calico).
-> **Plus corsé que l'exam-01** : RBAC cluster-scoped, scheduling manuel, taints/tolerations, Secrets, NetworkPolicy default-deny, `reclaimPolicy`/`subPath`, et un troubleshooting moins évident (sonde, dérive de labels, contrainte de placement, Secret manquant).
+> **Plus corsé que l'exam-01** : RBAC cluster-scoped, **upgrade kubeadm**, scheduling manuel, taints/tolerations, Secrets, **Ingress**, NetworkPolicy default-deny, `reclaimPolicy`/`subPath`, et un troubleshooting moins évident (sonde, **résolution DNS**, contrainte de placement, Secret manquant).
 > **Les solutions ne sont PAS dans ce fichier** → voir `solutions/SOLUTIONS.md` (à n'ouvrir qu'après).
 
 ---
@@ -12,11 +12,12 @@
 ```bash
 # Depuis la machine hôte, dans lab-setup/
 
-# 0. Cluster sain requis (cp1+w1+w2 Ready). Un « vagrant destroy » N'EST PAS
-#    nécessaire pour cet examen : tout se joue au niveau des objets K8s.
-#    Si ton cluster est dans un état incertain (labo précédent, composant cassé),
-#    repars propre :  vagrant destroy -f && vagrant up --no-parallel
-vagrant ssh cp1 -c "kubectl get nodes"   # valider : cp1/w1/w2 Ready avant de continuer
+# 0. ⚠️ IMPORTANT — cet examen contient une tâche d'UPGRADE IRRÉVERSIBLE (T2,
+#    à réaliser en DERNIER) qui fait passer le cluster de 1.34 à 1.35.
+#    setup.sh NE PEUT PAS redescendre le cluster : pars d'un cluster
+#    FRAÎCHEMENT déployé en 1.34 avant de commencer cet examen.
+vagrant destroy -f && vagrant up --no-parallel   # repartir propre (cluster 1.34)
+vagrant ssh cp1 -c "kubectl get nodes"           # valider : cp1/w1/w2 Ready (v1.34.x)
 
 # 1. Amorcer l'examen n°2 (namespaces + ressources cassées)
 vagrant ssh cp1 -c "bash /vagrant/mock-exam/exam-02/setup.sh"
@@ -56,10 +57,11 @@ Alias utiles déjà chargés : `k`, `$do` (`--dry-run=client -o yaml`), `$now`.
 
 > Attendu : `ci-bot` peut **créer un Deployment dans n'importe quel namespace** mais **ne peut pas** supprimer de node.
 
-### T2 — Sauvegarde etcd (8 pts) · sur `cp1`
-Réalise un **snapshot etcd** du cluster et enregistre-le dans **`/opt/etcd-backup.db`** sur `cp1`, avec les certificats du control plane (`/etc/kubernetes/pki/etcd/…`).
+### T2 — Upgrade du control plane 1.34 → 1.35 (8 pts) · sur `cp1` · ⚠️ **À FAIRE EN DERNIER (IRRÉVERSIBLE)**
+Fais passer le **node control plane `cp1`** de Kubernetes **1.34** à **1.35** avec `kubeadm` : bascule le dépôt apt sur `v1.35`, `kubeadm upgrade plan` puis `kubeadm upgrade apply`, et mets à jour **`kubelet` + `kubectl`** (drain/uncordon de `cp1`, redémarrage du kubelet). Les workers peuvent rester en 1.34.
 
-> Attendu : `/opt/etcd-backup.db` existe et est un snapshot etcd **valide**.
+> ⚠️ **Opération irréversible** : réalise-la **en toute dernière position**, une fois toutes les autres tâches terminées. Pour rejouer l'examen, il faudra redéployer le cluster (`vagrant destroy && vagrant up`).
+> Attendu : `kubectl get node cp1` affiche une version **`v1.35.x`**.
 
 ### T3 — Static Pod avec label (5 pts) · sur `w1`
 Sur le node **`w1`**, crée un **static pod** nommé `static-web` (image `nginx:1.29-alpine`, `containerPort` 80) via le répertoire des manifests statiques du kubelet. Le pod doit porter le **label `role=cache`**.
@@ -96,13 +98,14 @@ Crée un Deployment **`api`** : image **`nginx:1.29-alpine`**, **3 réplicas**, 
 
 ## 🌐 Services & Networking (20 pts)
 
-### T8 — Service ClusterIP (5 pts) · 🏷️ **ns `apps`**
-Expose le Deployment `api` (T5) via un Service **ClusterIP** nommé **`api-svc`**, port **80** → targetPort **80**.
+### T8 — Ingress (5 pts) · 🏷️ **ns `apps`**
+Crée un **Ingress** nommé **`api-ing`** qui route l'hôte **`api.cka.local`**, chemin **`/`** (`pathType: Prefix`), vers le Service **`api-np`** (défini en T9) sur le port **80**.
 
-> Attendu : `api-svc` de type ClusterIP avec **3 endpoints**.
+> Attendu : Ingress `api-ing` avec une règle host `api.cka.local` → service `api-np:80`, path `/` (Prefix).
+> ℹ️ Le lab n'a pas de contrôleur Ingress installé : seule la **définition** de la ressource est notée (pas le routage HTTP réel).
 
 ### T9 — Service NodePort (5 pts) · 🏷️ **ns `apps`**
-Crée un Service **NodePort** nommé **`api-np`** pour le Deployment `api`, port **80**, **nodePort `30090`**.
+Crée un Service **NodePort** nommé **`api-np`** pour le Deployment `api`, port **80**, **nodePort `30090`**. (Ce Service sert aussi de **backend à l'Ingress de T8**.)
 
 > Attendu : `api-np` type NodePort, nodePort `30090`, endpoints présents.
 
@@ -139,10 +142,10 @@ Le Deployment **`frontend`** tourne mais reste `0` disponible : sa **readinessPr
 
 > Attendu : `frontend` disponible (pods `Ready`).
 
-### T14 — Service sans endpoints (8 pts) · 🏷️ **ns `trouble`**
-Le Service **`store-svc`** ne renvoie aucun endpoint alors que le Deployment `store` tourne. Trouve et corrige la cause (cohérence **selector ↔ labels**).
+### T14 — Résolution DNS cassée (8 pts) · 🏷️ **ns `trouble`**
+Le Pod **`dns-check`** tourne mais **ne résout plus aucun nom** : sa configuration DNS pointe vers un serveur injoignable. Corrige-la pour qu'il résolve les noms de services du cluster (ex. `kubernetes.default`).
 
-> Attendu : `store-svc` a des **endpoints**.
+> Attendu : `dns-check` `Running` **et** capable de résoudre `kubernetes.default.svc.cluster.local` (via CoreDNS).
 
 ### T15 — Pod `Pending` (8 pts) · 🏷️ **ns `trouble`**
 Le Pod **`stuck`** reste `Pending` : il exige une contrainte de placement qu'aucun node ne satisfait. Fais en sorte qu'il tourne (le pod doit toujours s'appeler `stuck`, image `nginx:1.29-alpine`).

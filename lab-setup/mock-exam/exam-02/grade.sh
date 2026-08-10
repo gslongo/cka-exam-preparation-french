@@ -39,17 +39,12 @@ else
   fail 7 "T1 RBAC — SA + ClusterRole + ClusterRoleBinding (deployments cluster-wide)" $d "${r%; }"
 fi
 
-# T2 — etcd snapshot (8)
+# T2 — upgrade control plane cp1 vers 1.35 (8) — TÂCHE FINALE (irréversible)
 d=ARCH
-if sudo test -s /opt/etcd-backup.db 2>/dev/null; then
-  ok=0
-  if command -v etcdutl >/dev/null 2>&1; then sudo etcdutl snapshot status /opt/etcd-backup.db >/dev/null 2>&1 && ok=1
-  elif command -v etcdctl >/dev/null 2>&1; then sudo ETCDCTL_API=3 etcdctl snapshot status /opt/etcd-backup.db >/dev/null 2>&1 && ok=1
-  else ok=1; fi   # pas d'outil de validation dispo → on se contente d'un fichier non vide
-  sz=$(sudo stat -c%s /opt/etcd-backup.db 2>/dev/null || echo 0)
-  if [ "$ok" = "1" ] && [ "$sz" -gt 1024 ]; then pass 8 "T2 etcd — snapshot /opt/etcd-backup.db valide" $d
-  else fail 8 "T2 etcd — snapshot présent mais invalide/trop petit" $d "taille=${sz} o, statut snapshot=$([ "$ok" = 1 ] && echo ok || echo invalide)"; fi
-else fail 8 "T2 etcd — /opt/etcd-backup.db absent ou vide" $d "fichier /opt/etcd-backup.db absent ou vide"; fi
+cpver=$(jp get node cp1 -o jsonpath='{.status.nodeInfo.kubeletVersion}')
+if printf '%s' "$cpver" | grep -q '^v1\.35\.'; then
+  pass 8 "T2 upgrade — cp1 migré en $cpver (control plane en 1.35)" $d
+else fail 8 "T2 upgrade — passer le control plane cp1 de 1.34 à 1.35 (kubeadm upgrade)" $d "cp1 kubelet=${cpver:-?} (attendu v1.35.x)"; fi
 
 # T3 — static pod sur w1 avec label (5)
 d=ARCH
@@ -108,13 +103,15 @@ else fail 5 "T7 taint/toleration — taint dedicated=cka:NoSchedule sur w1 + pod
 # ══════════════════════════════════════════════════════════════════════════════
 dom NET 20 "🌐 Services & Networking"
 
-# T8 — ClusterIP api-svc (5)
+# T8 — Ingress api-ing (5) — pas de contrôleur dans le lab : on note la définition
 d=NET
-typ=$(jp -n apps get svc api-svc -o jsonpath='{.spec.type}')
-eps=$(jp -n apps get endpoints api-svc -o jsonpath='{.subsets[0].addresses[*].ip}' | wc -w)
-if [ "$typ" = "ClusterIP" ] && [ "$eps" -ge 3 ]; then
-  pass 5 "T8 ClusterIP — api-svc, ${eps} endpoints" $d
-else fail 5 "T8 ClusterIP — api-svc ClusterIP avec 3 endpoints" $d "type=${typ:-absent}, endpoints=${eps} (attendu ClusterIP/≥3)"; fi
+ihost=$(jp -n apps get ingress api-ing -o jsonpath='{.spec.rules[0].host}')
+isvc=$(jp -n apps get ingress api-ing -o jsonpath='{.spec.rules[0].http.paths[0].backend.service.name}')
+iport=$(jp -n apps get ingress api-ing -o jsonpath='{.spec.rules[0].http.paths[0].backend.service.port.number}')
+ipath=$(jp -n apps get ingress api-ing -o jsonpath='{.spec.rules[0].http.paths[0].path}')
+if [ "$ihost" = "api.cka.local" ] && [ "$isvc" = "api-np" ] && [ "$iport" = "80" ] && [ -n "$ipath" ]; then
+  pass 5 "T8 Ingress — api-ing : api.cka.local → api-np:80" $d
+else fail 5 "T8 Ingress — api-ing (host api.cka.local, path /, backend api-np:80)" $d "host=${ihost:-∅}, backend=${isvc:-∅}:${iport:-∅}, path=${ipath:-∅} (attendu api.cka.local/api-np/80/'/')"; fi
 
 # T9 — NodePort api-np (5)
 d=NET
@@ -181,12 +178,12 @@ if [ "${avail:-0}" -ge 1 ]; then
   pass 6 "T13 readinessProbe — frontend disponible" $d
 else fail 6 "T13 readinessProbe — corriger la sonde de frontend (pods Ready)" $d "availableReplicas=${avail:-0} (attendu ≥1)"; fi
 
-# T14 — endpoints service (8)
+# T14 — résolution DNS (8)
 d=TS
-eps=$(jp -n trouble get endpoints store-svc -o jsonpath='{.subsets[0].addresses[*].ip}' | wc -w)
-if [ "$eps" -ge 1 ]; then
-  pass 8 "T14 endpoints — store-svc a ${eps} endpoint(s)" $d
-else fail 8 "T14 endpoints — aligner le selector de store-svc et les labels des pods" $d "store-svc a ${eps} endpoint (attendu ≥1)"; fi
+phase=$(jp -n trouble get pod dns-check -o jsonpath='{.status.phase}')
+if [ "$phase" = "Running" ] && timeout 20 kubectl -n trouble exec dns-check -- nslookup kubernetes.default.svc.cluster.local >/dev/null 2>&1; then
+  pass 8 "T14 DNS — dns-check résout les noms du cluster" $d
+else fail 8 "T14 DNS — réparer la config DNS de dns-check (résolution des services cluster)" $d "phase=${phase:-absent}, résolution kubernetes.default.svc.cluster.local=$(timeout 20 kubectl -n trouble exec dns-check -- nslookup kubernetes.default.svc.cluster.local >/dev/null 2>&1 && echo OK || echo KO)"; fi
 
 # T15 — pod stuck Running (8)
 d=TS

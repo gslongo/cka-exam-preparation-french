@@ -25,19 +25,39 @@ kubectl auth can-i create deployments --as=system:serviceaccount:platform:ci-bot
 kubectl auth can-i delete nodes       --as=system:serviceaccount:platform:ci-bot               # no
 ```
 
-### T2 — Snapshot etcd (`/opt/etcd-backup.db` sur cp1)
+### T2 — Upgrade du control plane 1.34 → 1.35 (sur `cp1`) · ⚠️ à faire en DERNIER
+> **Irréversible** : une fois `cp1` en 1.35, `setup.sh` ne peut pas revenir en arrière → redeploy nécessaire pour rejouer l'examen.
 ```bash
-sudo ETCDCTL_API=3 etcdctl \
-  --endpoints=https://127.0.0.1:2379 \
-  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
-  --cert=/etc/kubernetes/pki/etcd/server.crt \
-  --key=/etc/kubernetes/pki/etcd/server.key \
-  snapshot save /opt/etcd-backup.db
+# 1) Basculer le dépôt apt de v1.34 → v1.35 (clé + liste)
+sudo curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.35/deb/Release.key \
+  | sudo gpg --dearmor --yes -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+sudo sed -i 's#v1\.34/deb#v1.35/deb#' /etc/apt/sources.list.d/kubernetes.list
+sudo apt-get update
 
-# Vérif
-sudo ETCDCTL_API=3 etcdctl snapshot status /opt/etcd-backup.db -w table
+# 2) Installer kubeadm 1.35 (le paquet est « hold » → unhold d'abord)
+sudo apt-cache madison kubeadm | head           # repérer le patch dispo, ex : 1.35.0-1.1
+sudo apt-mark unhold kubeadm
+sudo apt-get install -y kubeadm='1.35.0-1.1'     # adapter au patch listé
+sudo apt-mark hold kubeadm
+kubeadm version
+
+# 3) Planifier puis appliquer l'upgrade du control plane
+sudo kubeadm upgrade plan
+sudo kubeadm upgrade apply v1.35.0 -y            # adapter au patch exact
+
+# 4) Drainer cp1, upgrader kubelet + kubectl, redémarrer, uncordon
+kubectl drain cp1 --ignore-daemonsets
+sudo apt-mark unhold kubelet kubectl
+sudo apt-get install -y kubelet='1.35.0-1.1' kubectl='1.35.0-1.1'
+sudo apt-mark hold kubelet kubectl
+sudo systemctl daemon-reload
+sudo systemctl restart kubelet
+kubectl uncordon cp1
+
+# 5) Vérif
+kubectl get node cp1        # STATUS Ready, VERSION v1.35.x
 ```
-> Si `etcdctl` n'est pas installé : `sudo apt-get install -y etcd-client` (fait par `setup.sh`).
+> Pour upgrader aussi un worker (`w1`/`w2`) : même bascule de dépôt **sur le node**, puis `sudo kubeadm upgrade node`, `kubectl drain <node> --ignore-daemonsets` (depuis cp1), upgrade de `kubelet`, `systemctl restart kubelet`, `kubectl uncordon <node>`. La correction ne note que `cp1`.
 
 ### T3 — Static Pod avec label `role=cache` (sur `w1`)
 ```bash
@@ -147,11 +167,27 @@ EOF
 
 ## 🌐 Services & Networking
 
-### T8 — ClusterIP `api-svc` (`apps`)
+### T8 — Ingress `api-ing` (`apps`)
 ```bash
-kubectl -n apps expose deployment api --name=api-svc --port=80 --target-port=80
-kubectl -n apps get endpoints api-svc      # 3 IPs
+kubectl -n apps apply -f - <<'EOF'
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata: { name: api-ing, namespace: apps }
+spec:
+  rules:
+  - host: api.cka.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: api-np
+            port: { number: 80 }
+EOF
+kubectl -n apps get ingress api-ing
 ```
+> Le lab n'a **pas** de contrôleur Ingress → l'Ingress n'obtiendra pas d'adresse et ne routera pas réellement ; `grade.sh` ne vérifie que la **définition** (host / path / backend `api-np:80`).
 
 ### T9 — NodePort `api-np` (`apps`)
 ```bash
@@ -249,12 +285,16 @@ kubectl -n trouble patch deploy frontend --type=json \
 kubectl -n trouble rollout status deploy/frontend
 ```
 
-### T14 — Service sans endpoints (`trouble/store-svc`)
-Cause : le selector du Service (`app=store`) ne matche aucun pod (`app=store-v2`).
+### T14 — Résolution DNS cassée (`trouble/dns-check`)
+Cause : le pod utilise `dnsPolicy: None` avec un `dnsConfig.nameservers` injoignable (`192.0.2.53`) → aucune résolution. Les champs DNS d'un pod sont **immutables** → **supprimer & recréer** avec la politique par défaut (`ClusterFirst`, qui utilise CoreDNS).
 ```bash
-kubectl -n trouble patch svc store-svc -p '{"spec":{"selector":{"app":"store-v2"}}}'
-kubectl -n trouble get endpoints store-svc     # IPs présentes
+kubectl -n trouble delete pod dns-check
+kubectl -n trouble run dns-check --image=busybox:1.36 --labels=app=dns-check \
+  -- sh -c "sleep 100000"
+# dnsPolicy ClusterFirst par défaut → résout via CoreDNS (10.96.0.10)
+kubectl -n trouble exec dns-check -- nslookup kubernetes.default.svc.cluster.local
 ```
+> ⚠️ `busybox nslookup` n'applique pas les *search domains* du `resolv.conf` : le nom court `kubernetes.default` renvoie `NXDOMAIN` même quand le DNS marche. Teste avec le **FQDN** `kubernetes.default.svc.cluster.local` (c'est ce que vérifie `grade.sh`).
 
 ### T15 — Pod `Pending` (`trouble/stuck`)
 Cause : `nodeSelector disktype=nvme` qu'aucun node ne satisfait. Le `nodeSelector` d'un pod est **immutable** → **supprimer & recréer**.
@@ -275,7 +315,7 @@ kubectl -n trouble rollout status deploy/billing     # pods démarrent
 ```bash
 vagrant ssh cp1 -c "bash /vagrant/mock-exam/exam-02/setup.sh"   # ré-initialise l'environnement
 ```
-> `setup.sh` nettoie les namespaces d'exam, le PV, le ClusterRole/Binding, retire le taint de `w1`, les labels `disktype`, dé-cordonne les workers et supprime le snapshot. Le **static pod T3** sur `w1` se retire à la main :
+> `setup.sh` nettoie les namespaces d'exam, le PV, le ClusterRole/Binding, retire le taint de `w1`, les labels `disktype` et dé-cordonne les workers. **⚠️ Il ne peut PAS annuler l'upgrade de la T2** : si `cp1` est déjà en 1.35, redéploie le cluster (`vagrant destroy -f && vagrant up --no-parallel`). Le **static pod T3** sur `w1` se retire à la main :
 > ```bash
 > vagrant ssh w1 -c "sudo rm -f /etc/kubernetes/manifests/static-web.yaml"
 > ```
