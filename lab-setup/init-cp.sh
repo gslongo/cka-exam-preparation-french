@@ -73,6 +73,8 @@ cat >> /home/vagrant/.bashrc <<'EOF'
 alias k=kubectl
 export do='--dry-run=client -o yaml'
 export now='--force --grace-period=0'
+# bash-completion fournit _get_comp_words_by_ref, requis par la complétion kubectl
+[ -f /usr/share/bash-completion/bash_completion ] && source /usr/share/bash-completion/bash_completion
 source <(kubectl completion bash)
 complete -o default -F __start_kubectl k
 EOF

@@ -33,7 +33,7 @@ sysctl --system
 
 # --- 2. containerd (Ubuntu package suffit pour lab) ---
 apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y containerd apt-transport-https ca-certificates curl gpg
+DEBIAN_FRONTEND=noninteractive apt-get install -y containerd apt-transport-https ca-certificates curl gpg bash-completion
 
 mkdir -p /etc/containerd
 containerd config default > /etc/containerd/config.toml

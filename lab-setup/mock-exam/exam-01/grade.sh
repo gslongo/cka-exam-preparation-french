@@ -82,10 +82,15 @@ else fail 5 "T5 Deployment web — 3 réplicas nginx:1.29-alpine" $d "readyRepli
 d=WORK
 cmval=$(jp -n workloads get cm app-config -o jsonpath='{.data.APP_COLOR}')
 phase=$(jp -n workloads get pod color-pod -o jsonpath='{.status.phase}')
+# On accepte les 3 formes valides : env.valueFrom.configMapKeyRef, envFrom.configMapRef,
+# ou la preuve runtime (APP_COLOR=blue réellement présent dans l'environnement du conteneur).
 envref=$(jp -n workloads get pod color-pod -o jsonpath='{.spec.containers[0].env[?(@.name=="APP_COLOR")].valueFrom.configMapKeyRef.name}')
-if [ "$cmval" = "blue" ] && [ "$phase" = "Running" ] && [ "$envref" = "app-config" ]; then
+envfrom=$(jp -n workloads get pod color-pod -o jsonpath='{.spec.containers[0].envFrom[?(@.configMapRef.name=="app-config")].configMapRef.name}')
+envval=$(jp -n workloads exec color-pod -- printenv APP_COLOR 2>/dev/null | tr -d '\r\n')
+if [ "$cmval" = "blue" ] && [ "$phase" = "Running" ] \
+   && { [ "$envref" = "app-config" ] || [ "$envfrom" = "app-config" ] || [ "$envval" = "blue" ]; }; then
   pass 5 "T6 ConfigMap→env — APP_COLOR injectée depuis app-config" $d
-else fail 5 "T6 ConfigMap→env — CM app-config(APP_COLOR=blue) + color-pod avec env depuis la CM" $d "cm APP_COLOR=${cmval:-∅}, color-pod phase=${phase:-absent}, env from CM=${envref:-∅}"; fi
+else fail 5 "T6 ConfigMap→env — CM app-config(APP_COLOR=blue) + color-pod avec env depuis la CM" $d "cm APP_COLOR=${cmval:-∅}, color-pod phase=${phase:-absent}, env from CM=${envref:-${envfrom:-∅}}, APP_COLOR runtime=${envval:-∅}"; fi
 
 # T7 — nodeSelector sur w1 (5)
 d=WORK

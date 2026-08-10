@@ -40,11 +40,13 @@ Alias utiles déjà chargés : `k`, `$do` (`--dry-run=client -o yaml`), `$now`.
 | Storage | 10 | T11–T12 |
 | Troubleshooting | 30 | T13–T16 |
 
+> 🏷️ **RÈGLE D'OR — le namespace compte pour des points.** Chaque tâche impose un namespace précis (badge `🏷️ ns` dans son titre). Une ressource correcte mais **créée dans le mauvais namespace = 0 point** (le vrai CKA vérifie le namespace à la lettre). Réflexe : mets **`-n <namespace>`** sur *chaque* commande, et vérifie avec `kubectl -n <namespace> get …` avant de passer à la suite. Les tâches **T2, T3, T4** agissent au niveau **node/cluster** (pas de namespace).
+
 ---
 
 ## 🏛️ Cluster Architecture (25 pts)
 
-### T1 — RBAC (7 pts) · namespace `rbac-test`
+### T1 — RBAC (7 pts) · 🏷️ **ns `rbac-test`**
 Dans le namespace `rbac-test` :
 1. Crée un **ServiceAccount** `deploy-bot`.
 2. Crée un **Role** `pod-reader` autorisant uniquement `get`, `list`, `watch` sur les **pods**.
@@ -72,18 +74,18 @@ Le node **`w2`** doit partir en maintenance. Marque-le pour qu'**aucun nouveau p
 
 ## 📦 Workloads & Scheduling (15 pts)
 
-### T5 — Deployment + scale (5 pts) · namespace `workloads`
+### T5 — Deployment + scale (5 pts) · 🏷️ **ns `workloads`**
 Crée un Deployment **`web`** : image **`nginx:1.29-alpine`**, **3 réplicas**, `containerPort` 80.
 
 > Attendu : 3 pods `Ready`, bonne image.
 
-### T6 — ConfigMap → variable d'env (5 pts) · namespace `workloads`
+### T6 — ConfigMap → variable d'env (5 pts) · 🏷️ **ns `workloads`**
 1. Crée une **ConfigMap** `app-config` avec la clé **`APP_COLOR=blue`**.
 2. Crée un **Pod** `color-pod` (image `busybox:1.36`, commande `sleep 100000`) qui expose la variable d'environnement **`APP_COLOR`** à partir de cette ConfigMap.
 
 > Attendu : `color-pod` `Running`, variable `APP_COLOR` injectée depuis la ConfigMap.
 
-### T7 — Placement par label (5 pts) · namespace `workloads`
+### T7 — Placement par label (5 pts) · 🏷️ **ns `workloads`**
 1. Ajoute le label **`disktype=ssd`** au node **`w1`**.
 2. Crée un Pod **`ssd-pod`** (image `nginx:1.29-alpine`) qui, via un **`nodeSelector`**, ne peut se planifier **que** sur un node `disktype=ssd`.
 
@@ -93,17 +95,17 @@ Crée un Deployment **`web`** : image **`nginx:1.29-alpine`**, **3 réplicas**, 
 
 ## 🌐 Services & Networking (20 pts)
 
-### T8 — Service ClusterIP (5 pts) · namespace `workloads`
+### T8 — Service ClusterIP (5 pts) · 🏷️ **ns `workloads`**
 Expose le Deployment `web` (T5) via un Service **ClusterIP** nommé **`web-svc`**, port **80** → targetPort **80**.
 
 > Attendu : `web-svc` de type ClusterIP avec **3 endpoints**.
 
-### T9 — Service NodePort (5 pts) · namespace `workloads`
+### T9 — Service NodePort (5 pts) · 🏷️ **ns `workloads`**
 Crée un Service **NodePort** nommé **`web-np`** pour le Deployment `web`, port **80**, **nodePort `30080`**.
 
 > Attendu : `web-np` type NodePort, nodePort `30080`, endpoints présents.
 
-### T10 — NetworkPolicy (10 pts) · namespace `netpol`
+### T10 — NetworkPolicy (10 pts) · 🏷️ **ns `netpol`**
 Le namespace `netpol` contient déjà `backend` (label `app=backend`, écoute `:80`, Service `backend`), `frontend` (`app=frontend`) et `client` (`app=other`).
 Crée une **NetworkPolicy** **`backend-allow-frontend`** qui : sur les pods `app=backend`, n'autorise le trafic **entrant** **que** depuis les pods `app=frontend`, sur le **port 80**.
 
@@ -113,13 +115,13 @@ Crée une **NetworkPolicy** **`backend-allow-frontend`** qui : sur les pods `app
 
 ## 💾 Storage (10 pts)
 
-### T11 — PV + PVC (6 pts) · namespace `storage`
+### T11 — PV + PVC (6 pts) · 🏷️ **ns `storage`**
 1. Crée un **PersistentVolume** `pv-manual` : `1Gi`, `hostPath` `/mnt/data`, `accessModes: ReadWriteOnce`, `storageClassName: manual`.
 2. Crée un **PVC** `pvc-manual` dans `storage` : `500Mi`, `ReadWriteOnce`, `storageClassName: manual`.
 
 > Attendu : `pvc-manual` est **`Bound`** à `pv-manual`.
 
-### T12 — Pod monté sur le PVC (4 pts) · namespace `storage`
+### T12 — Pod monté sur le PVC (4 pts) · 🏷️ **ns `storage`**
 Crée un Pod **`pv-pod`** (image `nginx:1.29-alpine`) qui monte le PVC `pvc-manual` sur **`/usr/share/nginx/html`**.
 
 > Attendu : `pv-pod` `Running` avec le volume `pvc-manual` monté au bon chemin.
@@ -130,22 +132,22 @@ Crée un Pod **`pv-pod`** (image `nginx:1.29-alpine`) qui monte le PVC `pvc-manu
 
 > Ces ressources sont **déjà déployées et cassées** par `setup.sh`. **Répare-les.**
 
-### T13 — Pods qui ne démarrent pas (6 pts) · namespace `trouble`
+### T13 — Pods qui ne démarrent pas (6 pts) · 🏷️ **ns `trouble`**
 Le Deployment **`tshoot-web`** est en `ImagePullBackOff`. Corrige-le pour qu'il tourne (image valide **`nginx:1.29-alpine`**).
 
 > Attendu : `tshoot-web` disponible, pods `Running`.
 
-### T14 — Service sans endpoints (8 pts) · namespace `trouble`
+### T14 — Service sans endpoints (8 pts) · 🏷️ **ns `trouble`**
 Le Service **`api-svc`** ne renvoie aucun endpoint alors que le Deployment `api` tourne. Trouve et corrige la cause.
 
 > Attendu : `api-svc` a des **endpoints** (les pods `api`).
 
-### T15 — Pod `Pending` (8 pts) · namespace `trouble`
+### T15 — Pod `Pending` (8 pts) · 🏷️ **ns `trouble`**
 Le Pod **`hungry`** reste `Pending` et ne se planifie jamais. Fais en sorte qu'il tourne (le pod doit toujours s'appeler `hungry`, image `nginx:1.29-alpine`).
 
 > Attendu : un pod `hungry` `Running` dans `trouble`.
 
-### T16 — Deployment bloqué en création (8 pts) · namespace `trouble`
+### T16 — Deployment bloqué en création (8 pts) · 🏷️ **ns `trouble`**
 Le Deployment **`cfg-app`** est bloqué : il monte une ConfigMap **`cfg-app-config`** qui n'existe pas. Crée cette ConfigMap avec une clé **`app.properties`** contenant `mode=prod`, pour débloquer les pods.
 
 > Attendu : ConfigMap `cfg-app-config` (clé `app.properties`) présente **et** pods `cfg-app` `Running`.

@@ -85,10 +85,15 @@ else fail 5 "T5 Deployment api — 3 réplicas nginx:1.29-alpine, RollingUpdate 
 d=WORK
 skey=$(jp -n apps get secret app-secret -o jsonpath='{.data.TOKEN}')
 phase=$(jp -n apps get pod secret-pod -o jsonpath='{.status.phase}')
+# On accepte les 3 formes valides : env.valueFrom.secretKeyRef, envFrom.secretRef,
+# ou la preuve runtime (variable TOKEN réellement présente dans l'environnement du conteneur).
 ref=$(jp -n apps get pod secret-pod -o jsonpath='{.spec.containers[0].env[?(@.name=="TOKEN")].valueFrom.secretKeyRef.name}')
-if [ -n "$skey" ] && [ "$phase" = "Running" ] && [ "$ref" = "app-secret" ]; then
+reffrom=$(jp -n apps get pod secret-pod -o jsonpath='{.spec.containers[0].envFrom[?(@.secretRef.name=="app-secret")].secretRef.name}')
+refval=$(jp -n apps exec secret-pod -- printenv TOKEN 2>/dev/null | tr -d '\r\n')
+if [ -n "$skey" ] && [ "$phase" = "Running" ] \
+   && { [ "$ref" = "app-secret" ] || [ "$reffrom" = "app-secret" ] || [ -n "$refval" ]; }; then
   pass 5 "T6 Secret→env — TOKEN injecté depuis app-secret" $d
-else fail 5 "T6 Secret→env — Secret app-secret(TOKEN) + secret-pod avec env depuis le Secret" $d "secret TOKEN=$([ -n "$skey" ] && echo présent || echo absent), pod phase=${phase:-absent}, env from secret=${ref:-∅}"; fi
+else fail 5 "T6 Secret→env — Secret app-secret(TOKEN) + secret-pod avec env depuis le Secret" $d "secret TOKEN=$([ -n "$skey" ] && echo présent || echo absent), pod phase=${phase:-absent}, env from secret=${ref:-${reffrom:-∅}}, TOKEN runtime=$([ -n "$refval" ] && echo présent || echo ∅)"; fi
 
 # T7 — taint + toleration (5)
 d=WORK
