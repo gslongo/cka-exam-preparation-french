@@ -58,8 +58,9 @@ Alias utiles déjà chargés : `k`, `$do` (`--dry-run=client -o yaml`), `$now`.
 > Attendu : `ci-bot` peut **créer un Deployment dans n'importe quel namespace** mais **ne peut pas** supprimer de node.
 
 ### T2 — Upgrade du control plane 1.34 → 1.35 (8 pts) · sur `cp1` · ⚠️ **À FAIRE EN DERNIER (IRRÉVERSIBLE)**
-Fais passer le **node control plane `cp1`** de Kubernetes **1.34** à **1.35** avec `kubeadm` : bascule le dépôt apt sur `v1.35`, `kubeadm upgrade plan` puis `kubeadm upgrade apply`, et mets à jour **`kubelet` + `kubectl`** (drain/uncordon de `cp1`, redémarrage du kubelet). Les workers peuvent rester en 1.34.
+Fais passer le **node control plane `cp1`** de Kubernetes **1.34** à **1.35** avec `kubeadm` : bascule le dépôt apt sur `v1.35`, `kubeadm upgrade plan` puis `kubeadm upgrade apply`, et mets à jour **`kubelet` + `kubectl`** (drain/uncordon de `cp1`, redémarrage du kubelet).
 
+> ⚠️ **`cp1` UNIQUEMENT — n'upgrade PAS les workers.** Seul `cp1` est noté. Drainer `w1`/`w2` évince **définitivement** les pods « nus » des autres tâches (T4 `pinned`, T6 `secret-pod`, T7 `tolerant`, T12 `app`, T14 `dns-check`, T15 `stuck`, plus les seeds de `secure`) : sans contrôleur, ils ne sont **pas recréés** et tu perds ces points.
 > ⚠️ **Opération irréversible** : réalise-la **en toute dernière position**, une fois toutes les autres tâches terminées. Pour rejouer l'examen, il faudra redéployer le cluster (`vagrant destroy && vagrant up`).
 > Attendu : `kubectl get node cp1` affiche une version **`v1.35.x`**.
 

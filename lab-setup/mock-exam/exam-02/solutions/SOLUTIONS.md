@@ -57,7 +57,7 @@ kubectl uncordon cp1
 # 5) Vérif
 kubectl get node cp1        # STATUS Ready, VERSION v1.35.x
 ```
-> Pour upgrader aussi un worker (`w1`/`w2`) : même bascule de dépôt **sur le node**, puis `sudo kubeadm upgrade node`, `kubectl drain <node> --ignore-daemonsets` (depuis cp1), upgrade de `kubelet`, `systemctl restart kubelet`, `kubectl uncordon <node>`. La correction ne note que `cp1`.
+> ⚠️ **N'upgrade PAS les workers.** `grade.sh` ne note que `cp1`. Drainer `w1`/`w2` **évince définitivement** les pods « nus » des autres tâches (T4 `pinned`, T6 `secret-pod`, T7 `tolerant`, T12 `app`, T14 `dns-check`, T15 `stuck`, seeds de `secure`) : sans contrôleur ils **ne sont pas recréés** → tu perds ces points. Un drain de `cp1` est sans danger (il n'héberge aucun pod d'examen).
 
 ### T3 — Static Pod avec label `role=cache` (sur `w1`)
 ```bash
