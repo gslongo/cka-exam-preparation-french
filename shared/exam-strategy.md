@@ -39,7 +39,7 @@
 2. Setup 20 s : `alias k=kubectl`, `export do='--dry-run=client -o yaml'`, completion bash.
 3. `kubectl explain <res>.<champ>` pour les champs sans quitter le terminal.
 4. Doc kubernetes.io au **search**, pas aux bookmarks perso (secure browser).
-5. `kubectl config use-context` **avant chaque question** + verrouiller `-n <ns>`. Oubli = 0 point.
+5. `kubectl config use-context` **avant chaque question** + verrouiller `-n <ns>`. Oubli = 0 point. → [comment faire](#verrouiller-contexte-et-namespace)
 
 #### 🏗️ Cluster Architecture (25%)
 
