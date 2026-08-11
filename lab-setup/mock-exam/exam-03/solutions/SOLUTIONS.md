@@ -468,10 +468,16 @@ spec:
     - protocol: TCP
       port: 5432
 EOF
+
+# Vérifier l'enforcement (par IP, sans dépendre du DNS) :
+CA=$(kubectl -n project-mesh get pod -l app=cache-a -o jsonpath='{.items[0].status.podIP}')
+VA=$(kubectl -n project-mesh get pod -l app=vault   -o jsonpath='{.items[0].status.podIP}')
+kubectl -n project-mesh exec backend-1 -- /agnhost connect "$CA:6379" --timeout=3s   # OK (autorisé)
+kubectl -n project-mesh exec backend-1 -- /agnhost connect "$VA:9999" --timeout=3s   # TIMEOUT (bloqué)
 ```
 
 > Points clés testés :
-> - Politique **egress** : dès qu'un Pod `backend` est sélectionné avec `policyTypes: [Egress]`, **toute** sortie non listée est refusée (donc `audit:9999` est bloqué).
+> - Politique **egress** : dès qu'un Pod `backend` est sélectionné avec `policyTypes: [Egress]`, **toute** sortie non listée est refusée (donc `vault:9999` est bloqué).
 > - **Une règle `egress` par cible** → `cache-a` n'est joignable que sur `6379`, `cache-b` que sur `5432`. Fusionner les `to`/`ports` dans une seule règle autoriserait le **produit croisé** (cache-a:5432, cache-b:6379) — trop permissif.
 > - En pratique, pense à autoriser aussi l'egress DNS (`UDP/TCP 53`) si les Pods résolvent des noms.
 

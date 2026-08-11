@@ -351,10 +351,14 @@ echo "🌱 Seed T14 (NetworkPolicy egress)…"
 kubectl delete ns project-mesh --ignore-not-found >/dev/null 2>&1 || true
 kubectl wait --for=delete ns/project-mesh --timeout=60s >/dev/null 2>&1 || true
 kubectl create ns project-mesh >/dev/null 2>&1
-kubectl -n project-mesh run backend-1 --image=nginx:1-alpine --labels=app=backend >/dev/null 2>&1
-kubectl -n project-mesh run cache-a-1 --image=nginx:1-alpine --labels=app=cache-a >/dev/null 2>&1
-kubectl -n project-mesh run cache-b-1 --image=nginx:1-alpine --labels=app=cache-b >/dev/null 2>&1
-kubectl -n project-mesh run audit-1  --image=nginx:1-alpine --labels=app=audit  >/dev/null 2>&1
+# agnhost : backend = client (binaire /agnhost pour tester l'enforcement runtime),
+#           cache-a/cache-b/vault = écouteurs TCP sur leur port applicatif.
+AGN=registry.k8s.io/e2e-test-images/agnhost:2.53
+kubectl -n project-mesh run backend-1 --image="$AGN" --labels=app=backend --command -- /agnhost pause >/dev/null 2>&1
+kubectl -n project-mesh run cache-a-1 --image="$AGN" --labels=app=cache-a --command -- /agnhost netexec --http-port=6379 >/dev/null 2>&1
+kubectl -n project-mesh run cache-b-1 --image="$AGN" --labels=app=cache-b --command -- /agnhost netexec --http-port=5432 >/dev/null 2>&1
+kubectl -n project-mesh run vault-1   --image="$AGN" --labels=app=vault   --command -- /agnhost netexec --http-port=9999 >/dev/null 2>&1
+kubectl -n project-mesh wait --for=condition=Ready pod --all --timeout=120s >/dev/null 2>&1 || true
 
 # ──────────────────────────────────────────────────────────────────────────────
 # SEED — T16 : Pod à auditer via crictl (épinglé sur cp1 pour un crictl local)

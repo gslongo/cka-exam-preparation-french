@@ -120,43 +120,62 @@ fi
 # ══════════════════════════════════════════════════════════════════════════════
 dom AUTO 12 "🧩 HPA & Kustomize"
 
-# T5 — HPA via Kustomize : staging (4) + prod (4) + ConfigMap supprimée (4)
+# T5 — HPA via Kustomize : staging (3) + prod (3) + ConfigMap cluster (3) + build (3)
 d=AUTO
 s_min=$(kubectl -n api-gw-staging get hpa api-gw -o jsonpath='{.spec.minReplicas}' 2>/dev/null)
 s_max=$(kubectl -n api-gw-staging get hpa api-gw -o jsonpath='{.spec.maxReplicas}' 2>/dev/null)
 s_cpu=$(kubectl -n api-gw-staging get hpa api-gw -o jsonpath='{.spec.metrics[?(@.type=="Resource")].resource.target.averageUtilization}' 2>/dev/null)
 if [ "$s_min" = "2" ] && [ "$s_max" = "4" ] && [ "$s_cpu" = "50" ]; then
-  pass 4 "T5a staging — HPA api-gw min2 / max4 / cible CPU 50%" $d
+  pass 3 "T5a staging — HPA api-gw min2 / max4 / cible CPU 50%" $d
 else
   r=""
   [ "$s_min" = "2" ]  || r+="minReplicas=${s_min:-absent}(≠2); "
   [ "$s_max" = "4" ]  || r+="maxReplicas=${s_max:-absent}(≠4); "
   [ "$s_cpu" = "50" ] || r+="cible CPU=${s_cpu:-absent}(≠50); "
-  fail 4 "T5a staging — HPA api-gw (min2 max4 50% CPU)" $d "${r%; }"
+  fail 3 "T5a staging — HPA api-gw (min2 max4 50% CPU)" $d "${r%; }"
 fi
 
 p_min=$(kubectl -n api-gw-prod get hpa api-gw -o jsonpath='{.spec.minReplicas}' 2>/dev/null)
 p_max=$(kubectl -n api-gw-prod get hpa api-gw -o jsonpath='{.spec.maxReplicas}' 2>/dev/null)
 p_cpu=$(kubectl -n api-gw-prod get hpa api-gw -o jsonpath='{.spec.metrics[?(@.type=="Resource")].resource.target.averageUtilization}' 2>/dev/null)
 if [ "$p_min" = "2" ] && [ "$p_max" = "6" ] && [ "$p_cpu" = "50" ]; then
-  pass 4 "T5b prod — HPA api-gw min2 / max6 / cible CPU 50%" $d
+  pass 3 "T5b prod — HPA api-gw min2 / max6 / cible CPU 50%" $d
 else
   r=""
   [ "$p_min" = "2" ]  || r+="minReplicas=${p_min:-absent}(≠2); "
   [ "$p_max" = "6" ]  || r+="maxReplicas=${p_max:-absent}(≠6); "
   [ "$p_cpu" = "50" ] || r+="cible CPU=${p_cpu:-absent}(≠50); "
-  fail 4 "T5b prod — HPA api-gw (min2 max6 50% CPU)" $d "${r%; }"
+  fail 3 "T5b prod — HPA api-gw (min2 max6 50% CPU)" $d "${r%; }"
 fi
 
 cm_s=$(kubectl -n api-gw-staging get configmap scaling-config -o name 2>/dev/null)
 cm_p=$(kubectl -n api-gw-prod    get configmap scaling-config -o name 2>/dev/null)
 if [ -z "$cm_s" ] && [ -z "$cm_p" ]; then
-  pass 4 "T5c ConfigMap — scaling-config supprimée (staging + prod)" $d
+  pass 3 "T5c ConfigMap — scaling-config supprimée du cluster (staging + prod)" $d
 else
   r=""
   [ -z "$cm_s" ] || r+="scaling-config encore présente en staging; "
   [ -z "$cm_p" ] || r+="scaling-config encore présente en prod; "
-  fail 4 "T5c ConfigMap — supprimer scaling-config des 2 ns" $d "${r%; }"
+  fail 3 "T5c ConfigMap — supprimer scaling-config des 2 ns" $d "${r%; }"
+fi
+
+# T5d — hygiène Kustomize : le build staging+prod passe, la ConfigMap est retirée
+#        des resources (plus dans le build) et l'HPA y figure (pas juste appliqué à la main).
+KZ="$BASE/kustomize/api-gw"
+kb_stg=$(kubectl kustomize "$KZ/overlays/staging" 2>/dev/null)
+kb_prd=$(kubectl kustomize "$KZ/overlays/prod"    2>/dev/null)
+if [ -n "$kb_stg" ] && [ -n "$kb_prd" ] \
+   && printf '%s' "$kb_prd" | grep -q 'kind: HorizontalPodAutoscaler' \
+   && ! printf '%s' "$kb_stg" | grep -q 'name: scaling-config' \
+   && ! printf '%s' "$kb_prd" | grep -q 'name: scaling-config'; then
+  pass 3 "T5d Kustomize — build staging+prod OK, ConfigMap retirée des resources, HPA présent" $d
+else
+  r=""
+  { [ -n "$kb_stg" ] && [ -n "$kb_prd" ]; } || r+="kubectl kustomize échoue (build en erreur); "
+  printf '%s' "$kb_prd" | grep -q 'kind: HorizontalPodAutoscaler' || r+="HPA absent du build prod; "
+  printf '%s' "$kb_stg" | grep -q 'name: scaling-config' && r+="scaling-config encore dans le build staging (retire configmap.yaml des resources); "
+  printf '%s' "$kb_prd" | grep -q 'name: scaling-config' && r+="scaling-config encore dans le build prod; "
+  fail 3 "T5d Kustomize — build propre (ConfigMap retirée des resources, HPA présent)" $d "${r%; }"
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -434,30 +453,49 @@ fi
 # ══════════════════════════════════════════════════════════════════════════════
 dom NETEG 10 "🛡️  Réseau — NetworkPolicy egress"
 
-# T14 — egress backend → cache-a:6379 / cache-b:5432 (4 sélecteur+type / 3 / 3)
+# T14 — egress backend → cache-a:6379 / cache-b:5432 (spec 2/2/2 + enforcement runtime 2/2)
 d=NETEG
 np_pod=$(kubectl -n project-mesh get netpol np-egress -o jsonpath='{.spec.podSelector.matchLabels.app}' 2>/dev/null)
 np_types=$(kubectl -n project-mesh get netpol np-egress -o jsonpath='{.spec.policyTypes[*]}' 2>/dev/null)
 if [ "$np_pod" = "backend" ] && printf '%s' "$np_types" | grep -qw Egress; then
-  pass 4 "T14a np-egress — sélectionne app=backend, policyTypes Egress" $d
+  pass 2 "T14a np-egress — sélectionne app=backend, policyTypes Egress" $d
 else
   r=""
   [ "$np_pod" = "backend" ] || r+="podSelector app=${np_pod:-absent}(≠backend); "
   printf '%s' "$np_types" | grep -qw Egress || r+="policyTypes sans Egress (=${np_types:-absent}); "
-  fail 4 "T14a np-egress — podSelector app=backend + policyTypes Egress" $d "${r%; }"
+  fail 2 "T14a np-egress — podSelector app=backend + policyTypes Egress" $d "${r%; }"
 fi
 
 # paires (cible:port) par règle egress — une règle correcte associe une seule cible à son port
 pairs=$(kubectl -n project-mesh get netpol np-egress -o jsonpath='{range .spec.egress[*]}{.to[0].podSelector.matchLabels.app}:{.ports[0].port}{"\n"}{end}' 2>/dev/null)
 if printf '%s' "$pairs" | grep -qx 'cache-a:6379'; then
-  pass 3 "T14b egress — autorise app=cache-a sur le port 6379" $d
+  pass 2 "T14b egress — autorise app=cache-a sur le port 6379" $d
 else
-  fail 3 "T14b egress — app=cache-a sur le port 6379" $d "règles (cible:port) = $(printf '%s' "$pairs" | tr '\n' ' ')"
+  fail 2 "T14b egress — app=cache-a sur le port 6379" $d "règles (cible:port) = $(printf '%s' "$pairs" | tr '\n' ' ')"
 fi
 if printf '%s' "$pairs" | grep -qx 'cache-b:5432'; then
-  pass 3 "T14c egress — autorise app=cache-b sur le port 5432" $d
+  pass 2 "T14c egress — autorise app=cache-b sur le port 5432" $d
 else
-  fail 3 "T14c egress — app=cache-b sur le port 5432" $d "règles (cible:port) = $(printf '%s' "$pairs" | tr '\n' ' ')"
+  fail 2 "T14c egress — app=cache-b sur le port 5432" $d "règles (cible:port) = $(printf '%s' "$pairs" | tr '\n' ' ')"
+fi
+
+# T14d/e — enforcement runtime (connexion par IP depuis backend, sans dépendre du DNS).
+#          cache-a/cache-b/vault sont des écouteurs agnhost semés par setup.sh.
+NSM=project-mesh
+be=$(kubectl -n $NSM get pod -l app=backend -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+ca_ip=$(kubectl -n $NSM get pod -l app=cache-a -o jsonpath='{.items[0].status.podIP}' 2>/dev/null)
+vault_ip=$(kubectl -n $NSM get pod -l app=vault -o jsonpath='{.items[0].status.podIP}' 2>/dev/null)
+if [ -n "$be" ] && [ -n "$ca_ip" ] && kubectl -n $NSM exec "$be" -- /agnhost connect "$ca_ip:6379" --timeout=3s >/dev/null 2>&1; then
+  pass 2 "T14d enforcement — backend joint bien cache-a:6379 (autorisé)" $d
+else
+  fail 2 "T14d enforcement — backend doit pouvoir joindre cache-a:6379" $d \
+    "$( [ -z "$be" ] && echo "pod backend absent" || { [ -z "$ca_ip" ] && echo "IP cache-a introuvable" || echo "connexion refusée/timeout — la règle egress cache-a:6379 manque ou les labels sont incorrects"; } )"
+fi
+if [ -n "$be" ] && [ -n "$vault_ip" ] && ! kubectl -n $NSM exec "$be" -- /agnhost connect "$vault_ip:9999" --timeout=3s >/dev/null 2>&1; then
+  pass 2 "T14e enforcement — backend NE joint PAS vault:9999 (bloqué)" $d
+else
+  fail 2 "T14e enforcement — la sortie vers vault:9999 doit être bloquée" $d \
+    "$( [ -z "$be" ] && echo "pod backend absent" || { [ -z "$vault_ip" ] && echo "IP vault introuvable" || echo "vault:9999 est joignable — egress trop permissif (policyTypes Egress manquant ou règle catch-all)"; } )"
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -186,7 +186,7 @@ Suite à un incident, un *Pod* `backend-*` compromis a pu contacter tout le clus
 - se connecter aux *Pods* `cache-a-*` sur le port `6379` ;
 - se connecter aux *Pods* `cache-b-*` sur le port `5432`.
 
-Toute autre sortie (par ex. vers `audit-*` sur `9999`) doit être **bloquée**. Utilise les labels `app` des *Pods* dans ta politique.
+Toute autre sortie (par ex. vers `vault-*` sur `9999`) doit être **bloquée**. Utilise les labels `app` des *Pods* dans ta politique.
 
 > 💡 C'est une politique **egress** (`policyTypes: [Egress]`) : `podSelector` sélectionne `app=backend`, et chaque règle `egress` associe un `to.podSelector` (`app=cache-a` / `app=cache-b`) à son `ports`. Mets **une règle par cible** (sinon tu autorises le produit croisé des ports).
 > Attendu : `np-egress` sélectionne `app=backend`, type `Egress`, autorise `app=cache-a:6379` et `app=cache-b:5432` (et rien d'autre).

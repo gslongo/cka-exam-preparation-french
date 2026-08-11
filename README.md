@@ -11,7 +11,7 @@
 
 > 🏆 **Stratégie & Top 15** : [shared/exam-strategy.md](shared/exam-strategy.md) (méthode, timing, bookmarks, PSI)
 
-> 🎯 **Examens blancs auto-corrigés** : [exam-01](lab-setup/mock-exam/exam-01/EXAM.md) (intermédiaire) · [exam-02](lab-setup/mock-exam/exam-02/EXAM.md) (**avancé**) — 16 tâches chrono + correction `grade.sh`
+> 🎯 **Examens blancs auto-corrigés** : [exam-01](lab-setup/mock-exam/exam-01/EXAM.md) (intermédiaire) · [exam-02](lab-setup/mock-exam/exam-02/EXAM.md) (**avancé**) · [exam-03](lab-setup/mock-exam/exam-03/EXAM.md) (**expert — drills killer.sh**) — chrono + correction `grade.sh`
 
 > 🧭 **Par où commencer selon ton niveau** : [parcours express](#-parcours-express-selon-ton-niveau) (« débutant complet », « managé/cloud EKS·GKE·AKS » ou « K8s déjà avancé »)
 
@@ -47,7 +47,7 @@ CKA/                              ← workspace (ce dossier)
     ├── install-common.sh
     ├── init-cp.sh
     ├── join-worker.sh
-    └── mock-exam/                 ← examens blancs auto-corrigés (un dossier par sujet : exam-01/, exam-02/)
+    └── mock-exam/                 ← examens blancs auto-corrigés (un dossier par sujet : exam-01/, exam-02/, exam-03/)
 ```
 
 ## 🧰 Ressources transverses
@@ -62,20 +62,28 @@ CKA/                              ← workspace (ce dossier)
 - [lab-setup/README.md](lab-setup/README.md) — monter un cluster kubeadm local (Vagrant, init K8s 1.34 → upgrade 1.35 à pratiquer, objectif version exam)
 - [lab-setup/mock-exam/exam-01/EXAM.md](lab-setup/mock-exam/exam-01/EXAM.md) — examen blanc auto-corrigé, niveau intermédiaire (16 tâches, `setup.sh` + `grade.sh`)
 - [lab-setup/mock-exam/exam-02/EXAM.md](lab-setup/mock-exam/exam-02/EXAM.md) — examen blanc auto-corrigé, **niveau avancé** (RBAC cluster-scoped, taints, NetworkPolicy default-deny, `subPath`…)
+- [lab-setup/mock-exam/exam-03/EXAM.md](lab-setup/mock-exam/exam-03/EXAM.md) — examen blanc auto-corrigé, **niveau expert** — drills ciblés killer.sh (Helm/cert-manager, HPA+Kustomize, Gateway API, egress, `crictl`, ServiceCIDR…)
 
 ## 🎯 Examens blancs CKA
 
-Deux examens blancs complets **auto-corrigés** tournent sur le [lab local](lab-setup/README.md) : **16 tâches, 100 pts, seuil 66 %, ~2 h** chacun, pondérés par domaine comme le vrai CKA (Troubleshooting 30 % · Cluster Architecture 25 % · Réseau 20 % · Workloads 15 % · Storage 10 %). Chaque sujet vit dans son sous-dossier.
+Trois examens blancs complets **auto-corrigés** tournent sur le [lab local](lab-setup/README.md). Chaque sujet vit dans son sous-dossier.
+
+- **exam-01** & **exam-02** — format « vrai CKA » : **16 tâches, 100 pts, seuil 66 %, ~2 h**, pondérés par domaine (Troubleshooting 30 % · Cluster Architecture 25 % · Réseau 20 % · Workloads 15 % · Storage 10 %).
+- **exam-03** — format « killer.sh » : **drills ciblés** qui comblent les sujets pointus rencontrés sur killer.sh (mapping ~1:1 avec ses questions), au-delà de ce que couvrent exam-01/02.
+
+Détail des niveaux :
 
 - **exam-01** — niveau intermédiaire : RBAC namespacé, snapshot etcd, static pod, cordon, ConfigMap→env, NodePort, NetworkPolicy simple, PV/PVC…
 - **exam-02** — **niveau avancé** : RBAC *cluster-scoped*, scheduling manuel, taints/tolerations, Secret→env, NetworkPolicy *default-deny*, `reclaimPolicy`/`subPath`, troubleshooting moins évident (sonde, dérive de labels, contrainte de placement, Secret manquant).
+- **exam-03** — **niveau expert (drills killer.sh)** : extraction kubeconfig, Helm + cert-manager + ClusterIssuer, StatefulSet scale, QoS, **HPA + Kustomize**, PV/PVC monté par Deployment, `kubectl top`, upgrade worker + `kubeadm join`, API depuis un Pod, DaemonSet, anti-affinité multi-conteneurs, **Gateway API** (chemin + en-tête), `kubeadm certs renew`, **NetworkPolicy egress** (enforcement runtime), CoreDNS, `crictl`, introspection etcd, kube-proxy iptables, **Service CIDR** multi-range.
 
 | Sujet | Fichiers |
 |---|---|
 | **exam-01** (intermédiaire) | [EXAM.md](lab-setup/mock-exam/exam-01/EXAM.md) · [solutions/SOLUTIONS.md](lab-setup/mock-exam/exam-01/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/mock-exam/exam-01/setup.sh) · [grade.sh](lab-setup/mock-exam/exam-01/grade.sh) |
 | **exam-02** (avancé) | [EXAM.md](lab-setup/mock-exam/exam-02/EXAM.md) · [solutions/SOLUTIONS.md](lab-setup/mock-exam/exam-02/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/mock-exam/exam-02/setup.sh) · [grade.sh](lab-setup/mock-exam/exam-02/grade.sh) |
+| **exam-03** (expert — killer.sh) | [EXAM.md](lab-setup/mock-exam/exam-03/EXAM.md) · [solutions/SOLUTIONS.md](lab-setup/mock-exam/exam-03/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/mock-exam/exam-03/setup.sh) · [grade.sh](lab-setup/mock-exam/exam-03/grade.sh) |
 
-Dans chaque sujet : `EXAM.md` = **questions seules** · `solutions/SOLUTIONS.md` = corrigé (à n'ouvrir **qu'après**) · `setup.sh` = amorce **idempotente** · `grade.sh` = correcteur **automatique** (score /100 + verdict par domaine).
+Dans chaque sujet : `EXAM.md` = **questions seules** · `solutions/SOLUTIONS.md` = corrigé (à n'ouvrir **qu'après**) · `setup.sh` = amorce **idempotente** · `grade.sh` = correcteur **automatique** (score + verdict par domaine).
 
 > ▶️ **Mode d'emploi** (commandes `vagrant`) : voir [lab-setup/README.md](lab-setup/README.md).
 
@@ -121,7 +129,7 @@ Tu maîtrises `kubectl`, Deployments, Services… mais le managé t'a masqué la
 5. **Révision rapide** de ce que tu connais déjà : [02-workloads-scheduling.md](02-workloads-scheduling.md) + [04-storage.md](04-storage.md).
 6. **Vitesse** : [00-cheatsheet.md](00-cheatsheet.md) + [shared/kubectl-tips.md](shared/kubectl-tips.md) (alias `k`, `$do`, `$now`, JSONPath).
 7. **Passe l'[examen blanc exam-01](lab-setup/mock-exam/exam-01/EXAM.md)** en conditions réelles (chrono 2 h, correction auto `grade.sh`), puis enchaîne sur l'[exam-02 avancé](lab-setup/mock-exam/exam-02/EXAM.md) quand tu passes l'intermédiaire.
-8. **Drills** : [DOMAIN-REVIEW-CHECKLIST.md](DOMAIN-REVIEW-CHECKLIST.md) (50 tâches) puis **killer.sh** ×2.
+8. **Drills** : [DOMAIN-REVIEW-CHECKLIST.md](DOMAIN-REVIEW-CHECKLIST.md) (50 tâches), puis l'[exam-03](lab-setup/mock-exam/exam-03/EXAM.md) (drills ciblés killer.sh) et enfin **killer.sh** ×2.
 9. **J-1** : [shared/exam-strategy.md](shared/exam-strategy.md) (timing, bookmarks, PSI) + [PIEGES-EXAMEN.md](PIEGES-EXAMEN.md).
 
 ### 2️⃣ Tu as déjà un niveau K8s avancé
@@ -132,10 +140,10 @@ Tu connais l'admin. Il te reste la **vitesse**, le **format** et quelques **méc
 2. **Comble ciblé** les domaines ratés via les fiches concernées ([01](01-cluster-architecture.md) → [05](05-troubleshooting.md)) + [QUESTIONS-EXAMEN.md](QUESTIONS-EXAMEN.md) + [PIEGES-EXAMEN.md](PIEGES-EXAMEN.md).
 3. **Automatise les mécaniques CKA** sur le [lab](lab-setup/README.md) jusqu'au réflexe : **etcd backup/restore**, **kubeadm upgrade**, static pods, RBAC, `cordon`/`drain`. → [00-cheatsheet.md](00-cheatsheet.md).
 4. **Drills chrono** : [DOMAIN-REVIEW-CHECKLIST.md](DOMAIN-REVIEW-CHECKLIST.md) — vise la vitesse d'exécution, pas la découverte.
-5. **Rodage format** : **killer.sh** ×2 (plus dur que le vrai exam) + [shared/exam-strategy.md](shared/exam-strategy.md) (Top 15, alias, gestion des 2 h).
+5. **Rodage format** : enchaîne l'[exam-03](lab-setup/mock-exam/exam-03/EXAM.md) (drills experts ciblés killer.sh) puis **killer.sh** ×2 (plus dur que le vrai exam) + [shared/exam-strategy.md](shared/exam-strategy.md) (Top 15, alias, gestion des 2 h).
 6. **J-1** : [00-cheatsheet.md](00-cheatsheet.md) + [shared/yaml-snippets.md](shared/yaml-snippets.md).
 
-> 🔁 Les trois parcours convergent sur : **lab kubeadm → examen blanc chronométré → killer.sh**. La couche admin (fiche 01) + le troubleshooting (fiche 05) pèsent **55 %** de la note : c'est là qu'un profil « managé » gagne le plus de points.
+> 🔁 Les trois parcours convergent sur : **lab kubeadm → examen blanc chronométré → drills [exam-03](lab-setup/mock-exam/exam-03/EXAM.md) → killer.sh**. La couche admin (fiche 01) + le troubleshooting (fiche 05) pèsent **55 %** de la note : c'est là qu'un profil « managé » gagne le plus de points.
 
 ## 🗓️ Planning de révision (indicatif)
 
@@ -146,7 +154,7 @@ Tu connais l'admin. Il te reste la **vitesse**, le **format** et quelques **méc
 | S5 | Networking ([03](03-services-networking.md)) + CNI hands-on | Ingress, NetworkPolicy testés |
 | S6 | Storage ([04](04-storage.md)) + CSI | PVC static + dynamic |
 | S7 | Troubleshooting ([05](05-troubleshooting.md)) | Logs, events, `crictl`, etcd backup/restore |
-| S8 | killer.sh + [00-cheatsheet.md](00-cheatsheet.md) | Mock exam ×2, timing < 2 h |
+| S8 | [exam-03](lab-setup/mock-exam/exam-03/EXAM.md) (drills experts) + killer.sh + [00-cheatsheet.md](00-cheatsheet.md) | Mock exam ×3, timing < 2 h |
 
 ## 🔗 Ressources autorisées jour J
 
