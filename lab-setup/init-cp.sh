@@ -66,6 +66,37 @@ EOF
 kubeadm token create --print-join-command > /vagrant/join-command.sh
 chmod 0755 /vagrant/join-command.sh
 
+# --- 4b. Helm (compétence CKA « packaging » : install/upgrade de charts) ---
+# Pré-installé comme sur le vrai examen. Idempotent.
+if ! command -v helm >/dev/null 2>&1; then
+  curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+fi
+
+# --- 4c. metrics-server (kubectl top + HPA) avec --kubelet-insecure-tls ---
+# kubeadm utilise des certifs kubelet auto-signés -> flag insecure requis en lab.
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+kubectl -n kube-system patch deployment metrics-server --type=json \
+  -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+
+# --- 4d. crictl (cri-tools) : debug bas niveau du runtime containerd ---
+# Pré-installé comme sur le vrai examen (compétence « Troubleshooting »). Idempotent.
+if ! command -v crictl >/dev/null 2>&1; then
+  CRICTL_VER=$(curl -s https://api.github.com/repos/kubernetes-sigs/cri-tools/releases/latest | grep -oP '"tag_name": "\K[^"]+')
+  curl -fsSL "https://github.com/kubernetes-sigs/cri-tools/releases/download/${CRICTL_VER}/crictl-${CRICTL_VER}-linux-amd64.tar.gz" | tar -C /usr/local/bin -xz
+fi
+cat > /etc/crictl.yaml <<'EOF'
+runtime-endpoint: unix:///run/containerd/containerd.sock
+image-endpoint: unix:///run/containerd/containerd.sock
+timeout: 10
+EOF
+
+# --- 4e. Gateway API (CRDs standard) : successeur d'Ingress, sans contrôleur ---
+# Les CRDs suffisent pour créer/valider GatewayClass/Gateway/HTTPRoute en lab.
+if ! kubectl get crd httproutes.gateway.networking.k8s.io >/dev/null 2>&1; then
+  GWAPI_VER=$(curl -s https://api.github.com/repos/kubernetes-sigs/gateway-api/releases/latest | grep -oP '"tag_name": "\K[^"]+')
+  kubectl apply -f "https://github.com/kubernetes-sigs/gateway-api/releases/download/${GWAPI_VER}/standard-install.yaml"
+fi
+
 # --- 5. Alias & completion pour la session vagrant ---
 cat >> /home/vagrant/.bashrc <<'EOF'
 
