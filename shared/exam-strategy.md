@@ -19,6 +19,7 @@
   - [Bookmarks essentiels](#bookmarks-essentiels)
 - [🧭 Méthode pendant l'exam](#-méthode-pendant-lexam)
   - [Setup initial (30 s)](#setup-initial-30-s)
+  - [Verrouiller contexte et namespace](#verrouiller-contexte-et-namespace)
   - [Pour CHAQUE question](#pour-chaque-question)
   - [Priorisation en 2 h](#priorisation-en-2-h)
   - [Erreurs qui coûtent cher](#erreurs-qui-coûtent-cher)
@@ -143,6 +144,29 @@ export now='--force --grace-period=0'
 source <(kubectl completion bash)
 complete -o default -F __start_kubectl k
 ```
+
+### Verrouiller contexte et namespace
+
+> **Le réflexe anti-zéro n°1.** Du travail correct au mauvais endroit = **0 point** — 1ʳᵉ cause de points perdus (et la tienne sur killer.sh Q12/Q13).
+
+**« Verrouiller le namespace »** = écrire le namespace de la question dans ton **contexte courant**, une seule fois, pour que `kubectl` l'utilise partout **sans** répéter `-n` (et sans risquer de l'oublier) :
+
+```bash
+# 1) bon cluster — copie/colle la ligne donnée en haut de la question
+kubectl config use-context <cluster>
+
+# 2) verrouille le namespace de la question dans le contexte
+kubectl config set-context --current --namespace=<ns>
+
+# 3) VÉRIFIE avant de taper quoi que ce soit
+kubectl config get-contexts        # la ligne '*' montre CONTEXT + NAMESPACE
+```
+
+Ensuite `k get po`, `k apply -f …`, `k create …` ciblent tous `<ns>` sans `-n`.
+
+- **Pourquoi 0 point ?** l'énoncé dit « dans `project-foo` », tu oublies → l'objet atterrit dans `default` → le correcteur regarde `project-foo`, ne trouve rien → **0**, même avec un YAML parfait.
+- **Piège :** le namespace par défaut est stocké **par contexte**. Dès le `use-context` suivant il **repart** (souvent sur `default`) → **re-verrouille à chaque question**.
+- **Alternative ceinture+bretelles :** toujours écrire `-n <ns>` explicitement et ne jamais se fier au défaut. Peu importe la méthode — sois **constant** et vérifie avec `get-contexts`.
 
 ### Pour CHAQUE question
 
