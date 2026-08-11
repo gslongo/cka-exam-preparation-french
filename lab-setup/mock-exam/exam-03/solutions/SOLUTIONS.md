@@ -642,7 +642,7 @@ metadata:
   name: extra-range
 spec:
   cidrs:
-  - 12.64.0.0/12
+  - 11.96.0.0/12
 EOF
 
 # 3) Second Service avec une clusterIP issue de la nouvelle plage
@@ -653,7 +653,7 @@ metadata:
   name: range-svc2
   namespace: project-range
 spec:
-  clusterIP: 12.64.0.10
+  clusterIP: 11.96.0.10
   selector:
     run: range-probe
   ports:
@@ -663,13 +663,13 @@ EOF
 
 kubectl get servicecidr
 kubectl -n project-range get svc -o wide
-kubectl get ipaddress | grep 12.64      # l'IP allouée apparaît ici
+kubectl get ipaddress | grep 11.96      # l'IP allouée apparaît ici
 ```
 
 > Points clés testés :
 > - L'API **ServiceCIDR / IPAddress** (GA) permet d'ajouter des plages d'IP de Services **à chaud**, sans éditer `--service-cluster-ip-range` ni redémarrer `kube-apiserver`.
 > - Chaque IP de Service alloue un objet **IPAddress** ; `kubectl get ipaddress` liste les IP prises et leur Service parent.
-> - La plage par défaut est le ServiceCIDR nommé `kubernetes` ; on **ne le modifie pas**, on ajoute une plage complémentaire.
+> - La plage par défaut est le ServiceCIDR nommé `kubernetes` ; son champ `spec.cidrs` est **immuable** (l'API rejette toute modification : `field is immutable`). Même si un énoncé dit « changer » la plage, la seule opération possible est d'**ajouter** un ServiceCIDR complémentaire.
 > - À l'ancienne (hors CKA moderne), changer la plage imposait de modifier le drapeau du kube-apiserver et de **recréer** les Services — opération disruptive que l'API ServiceCIDR remplace.
 
 ---

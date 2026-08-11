@@ -268,8 +268,8 @@ Le cluster utilise **kube-proxy en mode iptables**. Dans le namespace `project-p
 
 - crée un Pod `range-probe` à partir de l'image `httpd:2-alpine` ;
 - expose-le avec un premier Service **ClusterIP** `range-svc` sur le port **80** (il obtient une IP de la plage par défaut) ;
-- crée un objet **ServiceCIDR** nommé `extra-range` couvrant la plage **`12.64.0.0/12`** ;
-- crée un second Service **ClusterIP** `range-svc2` vers le **même** Pod (port 80), en lui attribuant une **clusterIP appartenant à `12.64.0.0/12`**.
+- crée un objet **ServiceCIDR** nommé `extra-range` couvrant la plage **`11.96.0.0/12`** ;
+- crée un second Service **ClusterIP** `range-svc2` vers le **même** Pod (port 80), en lui attribuant une **clusterIP appartenant à `11.96.0.0/12`**.
 
-> 💡 `kubectl get servicecidr` montre la plage par défaut (`kubernetes`). Un ServiceCIDR **additif** étend les plages sans toucher au drapeau `--service-cluster-ip-range`. Pour `range-svc2`, fixe `spec.clusterIP` dans `12.64.0.0/12` (ex. `12.64.0.10`).
-> Attendu : ServiceCIDR `extra-range` (`12.64.0.0/12`) présent ; `range-svc2` possède une clusterIP comprise dans `12.64.0.0/12`.
+> 💡 `kubectl get servicecidr` montre la plage par défaut (`kubernetes`), qui est **immuable** : un énoncé disant « changer » la plage se traduit en pratique par l'**ajout** d'un ServiceCIDR (le drapeau `--service-cluster-ip-range` n'est pas touché). Pour `range-svc2`, fixe `spec.clusterIP` dans `11.96.0.0/12` (ex. `11.96.0.10`).
+> Attendu : ServiceCIDR `extra-range` (`11.96.0.0/12`) présent ; `range-svc2` possède une clusterIP comprise dans `11.96.0.0/12`.

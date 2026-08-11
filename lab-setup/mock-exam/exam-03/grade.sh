@@ -635,16 +635,16 @@ dom SVCCIDR 10 "🌐  Service CIDR (multi-range)"
 # T19 — ServiceCIDR additif + Service dans la nouvelle plage (4 CIDR / 4 IP / 2 base)
 d=SVCCIDR
 sc_cidrs="$(kubectl get servicecidr extra-range -o jsonpath='{.spec.cidrs}' 2>/dev/null)"
-if echo "$sc_cidrs" | grep -q '12.64.0.0/12'; then
-  pass 4 "T19a ServiceCIDR extra-range couvre 12.64.0.0/12" $d
+if echo "$sc_cidrs" | grep -q '11.96.0.0/12'; then
+  pass 4 "T19a ServiceCIDR extra-range couvre 11.96.0.0/12" $d
 else
-  fail 4 "T19a ServiceCIDR extra-range (12.64.0.0/12)" $d "l'objet ServiceCIDR extra-range est absent ou ne couvre pas 12.64.0.0/12"
+  fail 4 "T19a ServiceCIDR extra-range (11.96.0.0/12)" $d "l'objet ServiceCIDR extra-range est absent ou ne couvre pas 11.96.0.0/12"
 fi
 cip2="$(kubectl -n project-range get svc range-svc2 -o jsonpath='{.spec.clusterIP}' 2>/dev/null)"
-if echo "$cip2" | grep -qE '^12\.(6[4-9]|7[0-9])\.[0-9]+\.[0-9]+$'; then
-  pass 4 "T19b range-svc2 — clusterIP dans la nouvelle plage 12.64.0.0/12" $d
+if echo "$cip2" | grep -qE '^11\.(9[6-9]|10[0-9]|11[01])\.[0-9]+\.[0-9]+$'; then
+  pass 4 "T19b range-svc2 — clusterIP dans la nouvelle plage 11.96.0.0/12" $d
 else
-  fail 4 "T19b range-svc2 — clusterIP issue de 12.64.0.0/12" $d "range-svc2 n'a pas de clusterIP comprise dans 12.64.0.0/12"
+  fail 4 "T19b range-svc2 — clusterIP issue de 11.96.0.0/12" $d "range-svc2 n'a pas de clusterIP comprise dans 11.96.0.0/12"
 fi
 rp_ok=0; rs_ok=0
 [ "$(kubectl -n project-range get pod range-probe -o jsonpath='{.status.phase}' 2>/dev/null)" = "Running" ] && rp_ok=1
