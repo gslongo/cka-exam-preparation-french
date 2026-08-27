@@ -82,7 +82,7 @@ _Dernière mise à jour : 2026-07-31_
 | S2 | Mauvais **sujet** de SA | Format exact : `system:serviceaccount:<ns>:<name>`. |
 | S3 | Ne pas **vérifier** les droits | `kubectl auth can-i <verb> <res> --as=<user>` (ou `--as=system:serviceaccount:...`). |
 | S4 | Oublier que le verbe/ressource est **pluriel/exact** | `--resource=pods` (pas `pod`), verbes : `get,list,watch,create,update,patch,delete`. |
-| S5 | CSR : oublier d'**approuver** | `kubectl certificate approve <csr>` — sinon reste `Pending`, cert jamais émis. |
+| S5 | CSR : oublier d'**approuver** | CSR = demande de certif **client** (ex. accès d'un user à l'API/kubectl via `signerName: kubernetes.io/kube-apiserver-client`, `usages: [client auth]`). `kubectl certificate approve <csr>` sinon **le CSR** reste `Pending` (`.status.certificate` vide) → cert jamais émis, kubeconfig inutilisable. ⚠️ Le cert **authentifie** (CN=user, O=groupe) mais n'**autorise** rien → il faut encore un RoleBinding/ClusterRoleBinding. |
 
 ---
 
@@ -93,18 +93,18 @@ _Dernière mise à jour : 2026-07-31_
 | W1 | Modifier un **champ immuable** d'un Pod avec `apply` | Erreur `field is immutable` → `kubectl replace -f f.yaml --force` (delete+recreate). |
 | W2 | Confondre **taint** et **toleration** | Taint = sur le **node** (repousse). Toleration = sur le **Pod** (laisse passer, **n'attire pas**). Pour forcer un placement → `nodeSelector`/affinity **en plus**. |
 | W3 | Oublier de **tolérer le taint du control plane** pour un DaemonSet global | `node-role.kubernetes.io/control-plane:NoSchedule`. |
-| W7 | Oublier **`topologyKey`** dans `podAffinity`/`podAntiAffinity` | Champ **obligatoire** dans chaque terme → sinon `error validating data: missing required field "topologyKey"`. Valeurs classiques : `kubernetes.io/hostname` (par node), `topology.kubernetes.io/zone` (par zone). ⚠️ N'existe **pas** dans `nodeAffinity` (Pod→Node, pas de domaine topologique). |
-| W4 | `kubectl run` crée un **Pod**, pas un Deployment | Depuis 1.18, `run` = Pod nu. Pour un Deployment → `kubectl create deployment`. |
-| W5 | Générer du YAML sans `--dry-run=client` | `k create ... --dry-run=client -o yaml > f.yaml` puis éditer. Gagne un temps fou. |
-| W6 | `rollout undo` sur mauvaise ressource | `kubectl rollout undo deployment/<x>` (+ `--to-revision=N`). Vérifie avec `rollout history`. |
-| W7 | Oublier `--record` ou l'historique | `--record` est déprécié ; utilise `rollout history` + `kubernetes.io/change-cause` via annotation. |
-| W8 | Sidecar : vouloir éditer un Pod existant | On ne rajoute pas un conteneur à chaud → recréer le Pod. |
-| W9 | Pod **refusé** dans un namespace avec `ResourceQuota` | Si le quota fixe `requests`/`limits`, tout Pod **doit** les déclarer sinon `forbidden: failed quota`. Ajoute-les au Pod (ou pose un `LimitRange` avec des défauts). Vérifie : `kubectl describe quota -n <ns>`. |
-| W10 | Changer le **`selector` d'un Deployment** | `spec.selector.matchLabels` est **immuable** → `apply` échoue (`field is immutable`). Il faut **supprimer et recréer** le Deployment. |
-| W11 | `selector` qui ne **matche pas** `template.labels` | À la création : `selector does not match template labels`. Le `selector` doit être un **sous-ensemble** des labels du `template`. Piège #1 en écrivant un Deployment à la main. |
-| W12 | `imagePullPolicy` par défaut dépend du **tag** | Tag fixe (`nginx:1.25`) → `IfNotPresent`. Tag `:latest` ou **absent** → `Always` (re-pull à chaque fois). Surprise en debug d'image cachée. |
-| W13 | `--from-file` vs `--from-env-file` pour ConfigMap/Secret | `--from-file=f` = **1 clé = nom du fichier**, valeur = tout le contenu. `--from-env-file=f` = **1 clé par ligne** `KEY=val`. Se tromper crée une structure inexploitable par `configMapKeyRef`. |
-| W14 | `envFrom` sur un ConfigMap/Secret dont des clés ne sont pas des noms de variables valides | Clés avec `.`/`-` (ex `car.make`) = **invalides** comme env vars → K8s les **skippe silencieusement** (event `InvalidVariableNames`), le Pod démarre quand même sans elles. En **volume** ces mêmes clés passent (noms de fichiers OK). Vérifier avec `kubectl describe pod`. |
+| W4 | Oublier **`topologyKey`** dans `podAffinity`/`podAntiAffinity` | Champ **obligatoire** dans **chaque terme** (= chaque entrée `-` de la liste `required`/`preferredDuringSchedulingIgnoredDuringExecution`, **pas** une seule fois globalement) → sinon `error validating data: missing required field "topologyKey"`. Valeurs classiques : `kubernetes.io/hostname` (par node), `topology.kubernetes.io/zone` (par zone). ⚠️ N'existe **pas** dans `nodeAffinity` (Pod→Node, pas de domaine topologique). |
+| W5 | `kubectl run` crée un **Pod**, pas un Deployment | Depuis 1.18, `run` = Pod nu. Pour un Deployment → `kubectl create deployment`. |
+| W6 | Générer du YAML sans `--dry-run=client` | `k create ... --dry-run=client -o yaml > f.yaml` puis éditer. Gagne un temps fou. |
+| W7 | `rollout undo` sur mauvaise ressource | `kubectl rollout undo deployment/<x>` (+ `--to-revision=N`). Vérifie avec `rollout history`. |
+| W8 | Oublier `--record` ou l'historique | `--record` est **déprécié** → enregistre la cause via annotation : `kubectl annotate deploy/web kubernetes.io/change-cause="passage à nginx:1.25" --overwrite` — à faire **après** le changement (l'annotation s'attache à la **révision courante** ; sinon `CHANGE-CAUSE` = `<none>`). Consulter : `kubectl rollout history deploy/web` (colonne CHANGE-CAUSE) ; `--revision=N` pour le détail d'une révision. |
+| W9 | Sidecar : vouloir éditer un Pod existant | On ne rajoute pas un conteneur à chaud → recréer le Pod. |
+| W10 | Pod **refusé** dans un namespace avec `ResourceQuota` | Si le quota fixe `requests`/`limits`, tout Pod **doit** les déclarer sinon `forbidden: failed quota`. Ajoute-les au Pod (ou pose un `LimitRange` avec des défauts). Vérifie : `kubectl describe quota -n <ns>`. |
+| W11 | Changer le **`selector` d'un Deployment** | `spec.selector.matchLabels` est **immuable** → `apply` échoue (`field is immutable`). Il faut **supprimer et recréer** le Deployment. |
+| W12 | `selector` qui ne **matche pas** `template.labels` | À la création : `selector does not match template labels`. Le `selector` doit être un **sous-ensemble** des labels du `template`. Piège #1 en écrivant un Deployment à la main. |
+| W13 | `imagePullPolicy` par défaut dépend du **tag** | Tag fixe (`nginx:1.25`) → `IfNotPresent`. Tag `:latest` ou **absent** → `Always` (re-pull à chaque fois). Surprise en debug d'image cachée. |
+| W14 | `--from-file` vs `--from-env-file` pour ConfigMap/Secret | `--from-file=f` = **1 clé = nom du fichier**, valeur = tout le contenu. `--from-env-file=f` = **1 clé par ligne** `KEY=val`. Se tromper crée une structure inexploitable par `configMapKeyRef`. |
+| W15 | `envFrom` sur un ConfigMap/Secret dont des clés ne sont pas des noms de variables valides | Clés avec `.`/`-` (ex `car.make`) = **invalides** comme env vars → K8s les **skippe silencieusement** (event `InvalidVariableNames`), le Pod démarre quand même sans elles. En **volume** ces mêmes clés passent (noms de fichiers OK). Vérifier avec `kubectl describe pod`. |
 
 ---
 
@@ -116,7 +116,7 @@ _Dernière mise à jour : 2026-07-31_
 | N2 | Confondre `port` / `targetPort` / `nodePort` | `port` = port du Service · `targetPort` = port du conteneur · `nodePort` = 30000-32767 sur les nodes. |
 | N3 | NetworkPolicy sans **CNI compatible** | Flannel seul **n'applique pas** les NetPol. Il faut Calico/Cilium. |
 | N4 | NetworkPolicy : croire qu'elle « autorise » globalement | Dès qu'une NetPol sélectionne un Pod, tout le **non-autorisé** est bloqué (deny implicite sur ce type). |
-| N5 | Confondre `podSelector` et `namespaceSelector` dans `from` | Deux entrées séparées = OR ; sous le même `-` = AND. Piège fréquent. |
+| N5 | Confondre `podSelector` et `namespaceSelector` dans `from`/`to` d'une NetworkPolicy | `from` = **liste de sources** : chaque `-` = une source → **entre** sources = **OR** ; `podSelector` **+** `namespaceSelector` **sous le même `-`** = **AND**. Un `podSelector` **seul** = pods du **ns de la policy** ; un `namespaceSelector` **seul** = **tous** les pods des ns visés ; `{}` = « tout ». Exemple YAML OR vs AND sous le tableau. |
 | N6 | Ingress sans **Ingress Controller** | La règle Ingress ne sert à rien sans controller déployé. |
 | N7 | Oublier `pathType` (obligatoire en `networking.k8s.io/v1`) | `Prefix` le plus courant. |
 | N8 | DNS : mauvais **FQDN** | `<svc>.<ns>.svc.cluster.local`. Debug via un Pod `busybox` + `nslookup`. |
@@ -124,6 +124,27 @@ _Dernière mise à jour : 2026-07-31_
 | N10 | Confondre « DNS résout » et « Service a des endpoints » | Un Service **ClusterIP** résout **toujours** vers sa ClusterIP, **même sans Pod matché** (CoreDNS crée un A record par Service existant). Donc un souci de **résolution** (NXDOMAIN) = namespace (short name cross-ns), Service inexistant, ou CoreDNS KO — **pas** les selectors. Les selectors/labels cassent les **endpoints** → « connexion refusée/timeout », **pas** « ne résout pas ». Exception : Service **headless** (sans endpoints → pas d'A record). |
 | N11 | Confondre `pathType` (Ingress) et `path.type` (HTTPRoute) | Valeurs **différentes**. Ingress = `Prefix`/`Exact`/`ImplementationSpecific` sous `pathType`. HTTPRoute (Gateway API) = `PathPrefix`/`Exact`/`RegularExpression` sous `matches[].path.type`. Écrire `Prefix` dans un HTTPRoute (ou `PathPrefix` dans un Ingress) = rejet/no-match. |
 | N12 | Ingress : confondre **404** et **503** | **404** = aucune règle ne matche (mauvais/absent `Host:` ou path) → requête au **default backend**, *pas* à l'app. **503** = la règle **matche** mais le **backend Service n'a aucun endpoint** (Service inexistant, Pods `NotReady`, selector KO). Donc 503 = « le routing est bon, le backend est cassé » → `kubectl get endpointslices -l kubernetes.io/service-name=<svc>`. Ne pas debugger le `Host:` sur un 503. |
+| N13 | `create service` : selector **générique** `app=<nom>` (≠ `expose`) | `kubectl create service clusterip web --tcp=80:8080` pose un selector **fixe** `app=web` (**non** dérivé d'un workload) → **aucun endpoint** si les Pods ne portent pas `app=web`. À l'inverse `kubectl expose deploy web --port=80 --target-port=8080` **dérive** le selector des labels réels de la cible → branché direct. `create service externalname` reste le seul moyen impératif pour un **ExternalName**. Vérifie : `kubectl get ep <svc>`. |
+
+> **NetworkPolicy — OR vs AND dans `from`/`to`** (piège N5) : `from` est une **liste** de sources. Un `-` par source ⇒ **OR** entre elles. Mettre `podSelector` **et** `namespaceSelector` **sous le même `-`** ⇒ **AND** (les deux à la fois).
+>
+> ```yaml
+> # OR — 2 entrées : (tout pod d'un ns team=ops) OU (pod app=web du MÊME ns que la policy)
+> from:
+> - namespaceSelector:
+>     matchLabels: { team: ops }
+> - podSelector:
+>     matchLabels: { app: web }
+>
+> # AND — 1 entrée : UNIQUEMENT les pods app=web SITUÉS dans un ns team=ops
+> from:
+> - namespaceSelector:
+>     matchLabels: { team: ops }
+>   podSelector:
+>     matchLabels: { app: web }
+> ```
+>
+> Rappels : ça ne concerne que la ressource **`NetworkPolicy`** (`spec.ingress[].from` / `spec.egress[].to`). Les « sources » sont de **3 types** — `podSelector` (→ des **Pods**), `namespaceSelector` (→ des **Namespaces** = tous leurs Pods) et `ipBlock` (`cidr:` + `except:`, → des **plages IP** externes, surtout en egress). `podSelector` **seul** = pods du **ns de la policy** ; `namespaceSelector` **seul** = **tous** les pods des ns matchés ; `namespaceSelector: {}` = **tous les ns**. Toute la bascule OR/AND tient à l'**indentation** de `podSelector` (précédé d'un `-` = nouvelle entrée = OR ; aligné sous `namespaceSelector` = même entrée = AND). ⚠️ Cette sémantique liste=OR / même-`-`=AND est **propre au `NetworkPolicy`** : un selector de Service/Deployment (`matchLabels`) est toujours **AND**, et l'affinité a ses propres règles.
 
 ---
 
