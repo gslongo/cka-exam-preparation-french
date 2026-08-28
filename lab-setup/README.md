@@ -82,11 +82,21 @@ vagrant ssh cp1 -c "bash /vagrant/mock-exam/exam-01/setup.sh"
 Le dossier [labs/](labs/) contient des **labs ciblés** sur un thème (à la différence des examens blancs qui balaient tout le programme). Chacun garde la même mécanique **auto-corrigée** (`LAB.md` + `setup.sh` + `grade.sh` + `solutions/`) mais sans limite de temps.
 
 - [labs/lab-services-ingress-gateway/](labs/lab-services-ingress-gateway/) — **Services · Ingress · Gateway API** (100 pts, objectif 75 %). Services testés en direct (connectivité) ; Ingress/Gateway notés sur l'objet (aucun contrôleur installé). Installe au besoin les CRD Gateway API.
+- [labs/lab-storage-config-multicontainer/](labs/lab-storage-config-multicontainer/) — **Stockage · ConfigMap/Secrets · Sidecars** (100 pts, objectif 75 %). Binding statique PV/PVC et Pods testés en direct ; StorageClass notée sur l'objet (aucun provisioner CSI). Inclut la récupération d'un PV `Released` (claimRef) et le sidecar natif (K8s 1.29+).
+- [labs/lab-troubleshooting/](labs/lab-troubleshooting/) — **🔧 Troubleshooting transverse** (100 pts, objectif 75 %). **Tout est cassé au départ**, à diagnostiquer et réparer : 16 pannes réparties sur les 4 domaines (RBAC, static pod sur `cp1`, noeud `w1` hors service, finalizer, `ImagePull`/`CrashLoop`/config, `Pending`, readiness, selector/`targetPort`/NetworkPolicy/DNS, PVC). Tout est réparable depuis `cp1` + `kubectl` et testé en direct.
 
 ```bash
 # Préparer / se corriger (même principe que les examens)
 vagrant ssh cp1 -c "bash /vagrant/labs/lab-services-ingress-gateway/setup.sh"
 vagrant ssh cp1 -c "bash /vagrant/labs/lab-services-ingress-gateway/grade.sh"
+
+# Lab Stockage · ConfigMap/Secrets · Sidecars
+vagrant ssh cp1 -c "bash /vagrant/labs/lab-storage-config-multicontainer/setup.sh"
+vagrant ssh cp1 -c "bash /vagrant/labs/lab-storage-config-multicontainer/grade.sh"
+
+# Lab Troubleshooting transverse (tout est cassé, à réparer)
+vagrant ssh cp1 -c "bash /vagrant/labs/lab-troubleshooting/setup.sh"
+vagrant ssh cp1 -c "bash /vagrant/labs/lab-troubleshooting/grade.sh"
 ```
 
 ## Reset complet du cluster K8s (sans détruire les VMs)

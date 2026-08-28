@@ -13,6 +13,8 @@
 
 > 🎯 **Examens blancs auto-corrigés** : [exam-01](lab-setup/mock-exam/exam-01/EXAM.md) (intermédiaire) · [exam-02](lab-setup/mock-exam/exam-02/EXAM.md) (**avancé**) · [exam-03](lab-setup/mock-exam/exam-03/EXAM.md) (**expert — drills killer.sh**) — chrono + correction `grade.sh`
 
+> 🧪 **Labs thématiques auto-corrigés** : [Services · Ingress · Gateway API](lab-setup/labs/lab-services-ingress-gateway/LAB.md) · [Stockage · ConfigMap/Secrets · Sidecars](lab-setup/labs/lab-storage-config-multicontainer/LAB.md) · [🔧 Troubleshooting transverse](lab-setup/labs/lab-troubleshooting/LAB.md) — un sujet en profondeur (100 pts, seuil 75 %)
+
 > 🧭 **Par où commencer selon ton niveau** : [parcours express](#-parcours-express-selon-ton-niveau) (« débutant complet », « managé/cloud EKS·GKE·AKS » ou « K8s déjà avancé »)
 
 ---
@@ -47,7 +49,8 @@ CKA/                              ← workspace (ce dossier)
     ├── install-common.sh
     ├── init-cp.sh
     ├── join-worker.sh
-    └── mock-exam/                 ← examens blancs auto-corrigés (un dossier par sujet : exam-01/, exam-02/, exam-03/)
+    ├── mock-exam/                 ← examens blancs auto-corrigés (un dossier par sujet : exam-01/, exam-02/, exam-03/)
+    └── labs/                      ← labs thématiques ciblés (ex. lab-services-ingress-gateway/)
 ```
 
 ## 🧰 Ressources transverses
@@ -63,6 +66,9 @@ CKA/                              ← workspace (ce dossier)
 - [lab-setup/mock-exam/exam-01/EXAM.md](lab-setup/mock-exam/exam-01/EXAM.md) — examen blanc auto-corrigé, niveau intermédiaire (16 tâches, `setup.sh` + `grade.sh`)
 - [lab-setup/mock-exam/exam-02/EXAM.md](lab-setup/mock-exam/exam-02/EXAM.md) — examen blanc auto-corrigé, **niveau avancé** (RBAC cluster-scoped, taints, NetworkPolicy default-deny, `subPath`…)
 - [lab-setup/mock-exam/exam-03/EXAM.md](lab-setup/mock-exam/exam-03/EXAM.md) — examen blanc auto-corrigé, **niveau expert** — drills ciblés killer.sh (Helm/cert-manager, HPA+Kustomize, Gateway API, egress, `crictl`, ServiceCIDR…)
+- [lab-setup/labs/lab-services-ingress-gateway/LAB.md](lab-setup/labs/lab-services-ingress-gateway/LAB.md) — **lab thématique** auto-corrigé : Services · Ingress · Gateway API (100 pts, objectif ≥ 75 %, `setup.sh` + `grade.sh`)
+- [lab-setup/labs/lab-storage-config-multicontainer/LAB.md](lab-setup/labs/lab-storage-config-multicontainer/LAB.md) — **lab thématique** auto-corrigé : Stockage · ConfigMap/Secrets · Sidecars (100 pts, objectif ≥ 75 %, `setup.sh` + `grade.sh`)
+- [lab-setup/labs/lab-troubleshooting/LAB.md](lab-setup/labs/lab-troubleshooting/LAB.md) — **lab thématique** auto-corrigé : 🔧 Troubleshooting transverse — 16 pannes tous domaines à diagnostiquer et réparer (100 pts, objectif ≥ 75 %, `setup.sh` + `grade.sh`)
 
 ## 🎯 Examens blancs CKA
 
@@ -86,6 +92,16 @@ Détail des niveaux :
 Dans chaque sujet : `EXAM.md` = **questions seules** · `solutions/SOLUTIONS.md` = corrigé (à n'ouvrir **qu'après**) · `setup.sh` = amorce **idempotente** · `grade.sh` = correcteur **automatique** (score + verdict par domaine).
 
 > ▶️ **Mode d'emploi** (commandes `vagrant`) : voir [lab-setup/README.md](lab-setup/README.md).
+
+## 🧪 Labs thématiques
+
+À la différence des examens blancs (qui balaient tout le programme), les **labs thématiques** creusent **un sujet** en profondeur. Même mécanique auto-corrigée (`LAB.md` + `setup.sh` + `grade.sh` + `solutions/`), sans limite de temps.
+
+| Lab | Contenu | Barème |
+|---|---|---|
+| **Services · Ingress · Gateway API**<br>[LAB.md](lab-setup/labs/lab-services-ingress-gateway/LAB.md) · [solutions/](lab-setup/labs/lab-services-ingress-gateway/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/labs/lab-services-ingress-gateway/setup.sh) · [grade.sh](lab-setup/labs/lab-services-ingress-gateway/grade.sh) | Exposition du trafic L4→L7 : ClusterIP/NodePort/headless, Service sans selector + Endpoints, réparation de Service, Ingress (host/path, fanout, TLS), Gateway API (HTTPRoute préfixe, header-match, canary pondéré) | 100 pts · ≥ 75 % |
+| **Stockage · ConfigMap/Secrets · Sidecars**<br>[LAB.md](lab-setup/labs/lab-storage-config-multicontainer/LAB.md) · [solutions/](lab-setup/labs/lab-storage-config-multicontainer/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/labs/lab-storage-config-multicontainer/setup.sh) · [grade.sh](lab-setup/labs/lab-storage-config-multicontainer/grade.sh) | Persistance & configuration : StorageClass, binding statique PV/PVC, récupération d'un PV `Released` (claimRef), ConfigMap/Secrets (`envFrom`, `secretKeyRef`, volume), `emptyDir` partagé, sidecar natif (initContainer `restartPolicy: Always`) | 100 pts · ≥ 75 % |
+| **🔧 Troubleshooting transverse**<br>[LAB.md](lab-setup/labs/lab-troubleshooting/LAB.md) · [solutions/](lab-setup/labs/lab-troubleshooting/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/labs/lab-troubleshooting/setup.sh) · [grade.sh](lab-setup/labs/lab-troubleshooting/grade.sh) | **Tout est cassé, à réparer** — 16 pannes sur les 4 domaines : RBAC, static pod (`cp1`), noeud `w1` cordonné+taint, finalizer `Terminating`, `ImagePull`/`CrashLoop`/`CreateContainerConfigError`, `Pending` (ressources/nodeSelector), readiness, selector/`targetPort`/NetworkPolicy/`dnsPolicy`, PVC `Pending`/manquante. Testé en direct (trafic, DNS) | 100 pts · ≥ 75 % |
 
 ## 📚 Domaines & pondération CKA (curriculum CNCF)
 
