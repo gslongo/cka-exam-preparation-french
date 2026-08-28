@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# grade.sh — auto-grader for the "Cluster Maintenance, etcd & Security" lab.
+# Run ON cp1:  vagrant ssh cp1 -c "bash /vagrant/labs/lab-cluster-maintenance/grade.sh"
+#
+# Read-only: it changes NOTHING. Prints PASS/FAIL per task (with the observed symptom,
+# never the solution), a per-section subtotal and a score out of 100 (target ≥ 75%).
+set -uo pipefail
+
+SCORE=0
+declare -A DOM_GOT DOM_MAX
+
+pass() { SCORE=$((SCORE+$1)); DOM_GOT[$3]=$(( ${DOM_GOT[$3]:-0} + $1 )); printf "   \033[32m✅ +%-2d\033[0m %s\n" "$1" "$2"; }
+fail() { printf "   \033[31m❌  0 \033[0m %s\n" "$2"; [ -n "${4:-}" ] && printf "         \033[2m↳ %s\033[0m\n" "$4"; }
+dom()  { DOM_MAX[$1]=$2; printf "\n\033[1m%s (%d pts)\033[0m\n" "$3" "$2"; }
+jp()   { kubectl "$@" 2>/dev/null; }
+etcdctl_pod() { kubectl -n kube-system exec etcd-cp1 -- "$@" 2>/dev/null; }
+
+# ══════════════════════════════════════════════════════════════════════════════
+dom ETCD 26 "🗄️  etcd Backup & Restore"
+
+# T1 — etcd snapshot saved and valid (14)
+d=ETCD
+if sudo test -f /var/lib/etcd/etcd-backup.db && etcdctl_pod etcdutl snapshot status /var/lib/etcd/etcd-backup.db >/dev/null 2>&1; then
+  pass 14 "T1 etcd backup — /var/lib/etcd/etcd-backup.db is a valid snapshot" $d
+else
+  ex=$(sudo test -f /var/lib/etcd/etcd-backup.db && echo yes || echo no)
+  fail 14 "T1 etcd backup — save a valid etcd snapshot to /var/lib/etcd/etcd-backup.db" $d "file present=${ex}, etcdutl snapshot status failed or file missing"
+fi
+
+# T2 — snapshot restored into an alternate data-dir (12)
+d=ETCD
+if sudo test -d /var/lib/etcd/restore/member/snap && sudo test -d /var/lib/etcd/restore/member/wal; then
+  pass 12 "T2 etcd restore — snapshot restored into /var/lib/etcd/restore" $d
+else
+  fail 12 "T2 etcd restore — restore the snapshot into a new data-dir /var/lib/etcd/restore" $d "expected /var/lib/etcd/restore/member/{snap,wal} to exist"
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+dom CERTS 24 "🔐 Certificates & CSR"
+
+# T3 — CSR 'applicant' approved and issued (12)
+d=CERTS
+appr=$(jp get csr applicant -o jsonpath='{.status.conditions[?(@.type=="Approved")].status}')
+cert=$(jp get csr applicant -o jsonpath='{.status.certificate}')
+if [ "$appr" = "True" ] && [ -n "$cert" ]; then
+  pass 12 "T3 CSR — 'applicant' approved and certificate issued" $d
+else
+  fail 12 "T3 CSR — approve the pending CSR 'applicant' so a certificate is issued" $d "Approved=${appr:-∅}, certificate=$([ -n "$cert" ] && echo issued || echo empty)"
+fi
+
+# T6 — kube-apiserver certificate expiration written to the report file (12)
+d=CERTS
+exp=$(sudo kubeadm certs check-expiration 2>/dev/null | awk '/^apiserver /{print $2, $3, $4; exit}')
+if [ -f /opt/cka/apiserver-expiration.txt ] && [ -n "$exp" ] && grep -qF "$exp" /opt/cka/apiserver-expiration.txt 2>/dev/null; then
+  pass 12 "T6 cert expiry — apiserver expiration date reported correctly" $d
+else
+  got=$( [ -f /opt/cka/apiserver-expiration.txt ] && tr -d '\n' < /opt/cka/apiserver-expiration.txt | cut -c1-40 || echo "file missing")
+  fail 12 "T6 cert expiry — write the kube-apiserver cert expiration date to /opt/cka/apiserver-expiration.txt" $d "expected to contain '${exp:-?}', got: ${got}"
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+dom RBAC 26 "👤 RBAC & Authorization"
+
+# T4 — cluster-wide read-only ClusterRole bound to group 'viewers' (14)
+d=RBAC
+cl=$(jp auth can-i list pods --all-namespaces --as=tester --as-group=viewers)
+cd_=$(jp auth can-i delete pods --all-namespaces --as=tester --as-group=viewers)
+if [ "$cl" = "yes" ] && [ "$cd_" = "no" ]; then
+  pass 14 "T4 RBAC — group 'viewers' can list pods cluster-wide but not delete" $d
+else
+  r=""
+  [ "$cl" = "yes" ] || r+="cannot 'list' pods cluster-wide; "
+  [ "$cd_" = "no" ] || r+="can 'delete' pods (too permissive); "
+  fail 14 "T4 RBAC — bind ClusterRole 'pod-viewer' (get/list/watch pods) to group 'viewers'" $d "${r%; }"
+fi
+
+# T5 — namespaced Role for user 'auditor' in ns 'finance' (12)
+d=RBAC
+cf=$(jp auth can-i create configmaps -n finance --as=auditor)
+cx=$(jp auth can-i create configmaps -n default --as=auditor)
+if [ "$cf" = "yes" ] && [ "$cx" = "no" ]; then
+  pass 12 "T5 RBAC — user 'auditor' can manage configmaps in 'finance' only" $d
+else
+  r=""
+  [ "$cf" = "yes" ] || r+="cannot create configmaps in 'finance'; "
+  [ "$cx" = "no" ]  || r+="can create configmaps outside 'finance' (Role too wide / ClusterRoleBinding?); "
+  fail 12 "T5 RBAC — grant user 'auditor' configmap management in ns 'finance' (namespaced)" $d "${r%; }"
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+dom NODES 24 "🖥️  Nodes & Static Pods"
+
+# T7 — node w1 drained for maintenance (12)
+d=NODES
+u1=$(jp get node w1 -o jsonpath='{.spec.unschedulable}')
+onw1=$(jp -n legacy get pods --field-selector spec.nodeName=w1 --no-headers 2>/dev/null | grep -c .)
+if [ "$u1" = "true" ] && [ "${onw1:-0}" -eq 0 ]; then
+  pass 12 "T7 drain — w1 cordoned and 'legacy-app' evicted" $d
+else
+  fail 12 "T7 drain — drain node w1 (cordon + evict workloads) for maintenance" $d "w1 unschedulable=${u1:-false}, legacy-app pods still on w1=${onw1:-?}"
+fi
+
+# T8 — static pod on cp1 (12)
+d=NODES
+phase=$(jp get pod web-static-cp1 -o jsonpath='{.status.phase}')
+owner=$(jp get pod web-static-cp1 -o jsonpath='{.metadata.ownerReferences[0].kind}')
+img=$(jp get pod web-static-cp1 -o jsonpath='{.spec.containers[0].image}')
+if [ "$phase" = "Running" ] && [ "$owner" = "Node" ] && printf '%s' "$img" | grep -q 'nginx:1.29-alpine'; then
+  pass 12 "T8 static pod — 'web-static-cp1' Running (managed by kubelet)" $d
+else
+  fail 12 "T8 static pod — create a static pod 'web-static' on cp1 (nginx:1.29-alpine)" $d "phase=${phase:-absent}, owner=${owner:-?}, image=${img:-∅} (expected Running/Node/nginx:1.29-alpine)"
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+echo
+echo "────────────────────────────────────────────────────────"
+printf "\033[1mSubtotal per section:\033[0m\n"
+order=(ETCD CERTS RBAC NODES)
+names=( "etcd Backup & Restore" "Certificates & CSR" "RBAC & Authorization" "Nodes & Static Pods" )
+for i in "${!order[@]}"; do
+  k=${order[$i]}
+  printf "  %-30s %2d / %2d\n" "${names[$i]}" "${DOM_GOT[$k]:-0}" "${DOM_MAX[$k]}"
+done
+echo "────────────────────────────────────────────────────────"
+printf "\033[1mTOTAL SCORE : %d / 100\033[0m\n" "$SCORE"
+if [ "$SCORE" -ge 75 ]; then
+  printf "\033[32m🎉 TARGET REACHED (≥ 75%%)\033[0m\n"
+else
+  printf "\033[31mKEEP PRACTISING (< 75%%) — %d pts short\033[0m\n" $((75-SCORE))
+fi
+echo "────────────────────────────────────────────────────────"
