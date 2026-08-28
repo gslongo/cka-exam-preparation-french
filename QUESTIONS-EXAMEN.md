@@ -1,11 +1,10 @@
 # 📝 Questions à haute probabilité d'examen CKA
 
-> Fichier vivant — l'agent ajoute des questions au fil de la session.
 > Chaque entrée : **énoncé type** · **solution** · **logique** (le *pourquoi*, pas juste le *comment*).
 > Basé sur le curriculum CKA v1.35 (exam actuel) et les patterns killer.sh / retours candidats.
 > **Trié par probabilité d'apparition décroissante.**
 
-_Dernière mise à jour : 2026-07-27_
+_Dernière mise à jour : 2026-08-28_
 
 **Rappel exam** : 2 h · ~15-20 tâches · passage **66 %** · toujours `kubectl config use-context <ctx>` avant chaque tâche.
 
@@ -34,6 +33,13 @@ _Dernière mise à jour : 2026-07-27_
 - [Q17 · DNS / connectivité Service — debug ⭐⭐](#q17--dns--connectivité-service--debug-)
 - [Q18 · Approuver un CertificateSigningRequest ⭐⭐](#q18--approuver-un-certificatesigningrequest-)
 - [Q19 · Grow the cluster — `kubeadm join` (token expiré) ⭐⭐](#q19--grow-the-cluster--kubeadm-join-token-expiré-)
+- [Q20 · Helm — installer un chart ⭐⭐](#q20--helm--installer-un-chart-)
+- [Q21 · HPA + Kustomize ⭐⭐](#q21--hpa--kustomize-)
+- [Q22 · kubectl top — usage ressources ⭐⭐](#q22--kubectl-top--usage-ressources-)
+- [Q23 · Certs kubeadm — expiration & renew ⭐⭐](#q23--certs-kubeadm--expiration--renew-)
+- [Q24 · Gateway API — HTTPRoute ⭐⭐](#q24--gateway-api--httproute-)
+- [Q25 · API depuis un Pod — token ServiceAccount ⭐⭐](#q25--api-depuis-un-pod--token-serviceaccount-)
+- [Q26 · ServiceCIDR — étendre la plage d'IP ⭐](#q26--servicecidr--étendre-la-plage-dip-)
 
 </details>
 
@@ -41,25 +47,32 @@ _Dernière mise à jour : 2026-07-27_
 
 | # | Question | Domaine | Fréquence |
 |---|---|---|---|
-| Q1 | Sauvegarder + restaurer etcd | 01 | ⭐⭐⭐ quasi garantie |
-| Q2 | Upgrade kubeadm (CP + worker) | 01 | ⭐⭐⭐ |
-| Q3 | Réparer un static Pod cassé | 01/05 | ⭐⭐⭐ |
-| Q4 | Node NotReady → diagnostiquer | 05 | ⭐⭐⭐ |
-| Q5 | Pod Pending → diagnostiquer le scheduling | 05/02 | ⭐⭐⭐ |
-| Q6 | Créer une NetworkPolicy | 03 | ⭐⭐⭐ |
-| Q7 | Scheduling : taint + toleration + nodeSelector | 02 | ⭐⭐⭐ |
-| Q8 | RBAC : Role + RoleBinding + ServiceAccount | 01 | ⭐⭐ |
-| Q9 | Exposer un Deployment (Service) | 03 | ⭐⭐ |
-| Q10 | Rolling update + rollback d'un Deployment | 02 | ⭐⭐ |
-| Q11 | ConfigMap / Secret → variables & volume | 02 | ⭐⭐ |
-| Q12 | Sidecar / Pod multi-conteneurs | 02 | ⭐⭐ |
-| Q13 | DaemonSet | 02 | ⭐⭐ |
-| Q14 | PVC + Pod qui le monte | 04 | ⭐⭐ |
-| Q15 | PV + StorageClass + PVC | 04 | ⭐⭐ |
-| Q16 | Ingress | 03 | ⭐⭐ |
-| Q17 | DNS / connectivité Service (debug) | 03/05 | ⭐⭐ |
-| Q18 | Approuver un CertificateSigningRequest | 01 | ⭐⭐ |
-| Q19 | Grow the cluster : `kubeadm join` (token expiré) | 01 | ⭐⭐ |
+| [Q1](#q1--etcd--snapshot-save--restore-) | Sauvegarder + restaurer etcd | 01 | ⭐⭐⭐ quasi garantie |
+| [Q2](#q2--upgrade-kubeadm-) | Upgrade kubeadm (CP + worker) | 01 | ⭐⭐⭐ |
+| [Q3](#q3--réparer-un-static-pod-cassé-) | Réparer un static Pod cassé | 01/05 | ⭐⭐⭐ |
+| [Q4](#q4--node-notready--diagnostic-) | Node NotReady → diagnostiquer | 05 | ⭐⭐⭐ |
+| [Q5](#q5--pod-pending--diagnostiquer-le-scheduling-) | Pod Pending → diagnostiquer le scheduling | 05/02 | ⭐⭐⭐ |
+| [Q6](#q6--networkpolicy-) | Créer une NetworkPolicy | 03 | ⭐⭐⭐ |
+| [Q7](#q7--scheduling--taint--toleration--nodeselector-) | Scheduling : taint + toleration + nodeSelector | 02 | ⭐⭐⭐ |
+| [Q8](#q8--rbac--role--rolebinding--sa-) | RBAC : Role + RoleBinding + ServiceAccount | 01 | ⭐⭐ |
+| [Q9](#q9--exposer-un-deployment-) | Exposer un Deployment (Service) | 03 | ⭐⭐ |
+| [Q10](#q10--rolling-update--rollback-) | Rolling update + rollback d'un Deployment | 02 | ⭐⭐ |
+| [Q11](#q11--configmap--secret--env--volume-) | ConfigMap / Secret → variables & volume | 02 | ⭐⭐ |
+| [Q12](#q12--sidecar--pod-multi-conteneurs-) | Sidecar / Pod multi-conteneurs | 02 | ⭐⭐ |
+| [Q13](#q13--daemonset-) | DaemonSet | 02 | ⭐⭐ |
+| [Q14](#q14--pvc--pod-qui-le-monte-) | PVC + Pod qui le monte | 04 | ⭐⭐ |
+| [Q15](#q15--pv--storageclass--pvc-) | PV + StorageClass + PVC | 04 | ⭐⭐ |
+| [Q16](#q16--ingress-) | Ingress | 03 | ⭐⭐ |
+| [Q17](#q17--dns--connectivité-service--debug-) | DNS / connectivité Service (debug) | 03/05 | ⭐⭐ |
+| [Q18](#q18--approuver-un-certificatesigningrequest-) | Approuver un CertificateSigningRequest | 01 | ⭐⭐ |
+| [Q19](#q19--grow-the-cluster--kubeadm-join-token-expiré-) | Grow the cluster : `kubeadm join` (token expiré) | 01 | ⭐⭐ |
+| [Q20](#q20--helm--installer-un-chart-) | Helm : installer un chart + release | 01 | ⭐⭐ |
+| [Q21](#q21--hpa--kustomize-) | HPA (+ Kustomize) | 02 | ⭐⭐ |
+| [Q22](#q22--kubectl-top--usage-ressources-) | `kubectl top` — usage ressources | 05 | ⭐⭐ |
+| [Q23](#q23--certs-kubeadm--expiration--renew-) | Certs kubeadm : expiration & renew | 01 | ⭐⭐ |
+| [Q24](#q24--gateway-api--httproute-) | Gateway API — HTTPRoute | 03 | ⭐⭐ |
+| [Q25](#q25--api-depuis-un-pod--token-serviceaccount-) | Requêter l'API depuis un Pod (token SA) | 01 | ⭐⭐ |
+| [Q26](#q26--servicecidr--étendre-la-plage-dip-) | ServiceCIDR — étendre la plage d'IP | 03 | ⭐ |
 
 ---
 
@@ -289,6 +302,18 @@ spec:
 - `from` liste les sources autorisées. Attention à la différence `podSelector` vs `namespaceSelector`.
 - **Requiert un CNI qui applique les NetPol** (Calico/Cilium ; PAS Flannel seul).
 
+> **Variante — egress** : pour restreindre les **sorties** d'un Pod, `policyTypes: [Egress]` + un bloc `egress:` avec `to:` (au lieu de `ingress:`/`from:`). Mets **une règle par cible** (`to` + `ports`) sinon tu autorises le produit croisé des ports. ⚠️ Pense à **autoriser le DNS** (`kube-dns`, UDP/TCP 53) sinon la résolution casse.
+> ```yaml
+> spec:
+>   podSelector: { matchLabels: { app: backend } }
+>   policyTypes: [Egress]
+>   egress:
+>     - to:
+>         - podSelector: { matchLabels: { app: cache } }
+>       ports:
+>         - { protocol: TCP, port: 6379 }
+> ```
+
 ---
 
 ## Q7 · Scheduling — taint + toleration + nodeSelector ⭐⭐⭐
@@ -325,6 +350,17 @@ spec:
 - **Taint (sur le node)** repousse : `NoSchedule` bloque tout Pod sans toleration. **Toleration (sur le Pod)** = laissez-passer, mais **n'attire pas**.
 - Pour *forcer* le Pod sur ce node précis, il faut **en plus** un `nodeSelector`/`nodeAffinity`.
 - Vérifier : `kubectl describe node w1 | grep Taints`.
+
+> **Variante — (anti-)affinité de Pod** : pour n'avoir **qu'un Pod par node** (façon DaemonSet), `podAntiAffinity` **required** avec `topologyKey: kubernetes.io/hostname` (champ **obligatoire** dans chaque terme).
+> ```yaml
+> affinity:
+>   podAntiAffinity:
+>     requiredDuringSchedulingIgnoredDuringExecution:
+>       - labelSelector:
+>           matchLabels: { id: edge-node }
+>         topologyKey: kubernetes.io/hostname
+> ```
+> Si `replicas` > nombre de nodes éligibles, les Pods en trop restent **`Pending`** (attendu). `podAffinity` = **colocaliser** ; `nodeAffinity` = cibler des **nodes** (pas de `topologyKey`).
 
 ---
 
@@ -672,6 +708,219 @@ kubectl get nodes            # le node passe Ready (après démarrage du CNI)
 - `kubeadm join` s'exécute **sur le worker**, PAS sur le control plane.
 - Le node peut rester **NotReady** quelques secondes le temps que le CNI démarre → normal, attendre.
 - Prérequis (déjà en place à l'exam en général) : containerd + kubelet installés, swap off, modules kernel.
+
+---
+
+## Q20 · Helm — installer un chart ⭐⭐
+
+**Énoncé type**
+> Install the `jetstack/cert-manager` chart into namespace `pki` with release name `certman`, enabling CRDs. Then list the release.
+
+**Solution**
+```bash
+helm repo add jetstack https://charts.jetstack.io   # ajouter le repo
+helm repo update                                     # rafraîchir l'index
+helm install certman jetstack/cert-manager \
+  -n pki --create-namespace \
+  --set crds.enabled=true                            # release "certman"
+
+helm list -n pki                                     # vérifier (STATUS deployed, REVISION 1)
+```
+
+**Logique**
+- `helm repo add` **puis** `helm repo update` avant `install`, sinon le chart est introuvable.
+- `--create-namespace` crée le ns si absent ; les *values* se passent en `--set k=v` ou `-f values.yaml`.
+- Choisir une version : `helm search repo cert-manager --versions` → `--version <x>`.
+- Vérifs : `helm list -n <ns>` (release + révision), `helm status <release> -n <ns>`.
+- Prévisualiser sans installer : `helm template …` ou `helm install --dry-run`. Mettre à jour : `helm upgrade` ; annuler : `helm rollback <release> <rev>`.
+
+---
+
+## Q21 · HPA + Kustomize ⭐⭐
+
+**Énoncé type**
+> Add an HPA `web` for deployment `web` (min 2, max 6, target 50% CPU). Apply it via Kustomize to a staging overlay.
+
+**Solution**
+```bash
+# Impératif (le plus rapide) :
+kubectl autoscale deployment web --min=2 --max=6 --cpu-percent=50
+```
+```yaml
+# Déclaratif (autoscaling/v2) :
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: web }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: web }
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 50 }
+```
+```bash
+kubectl kustomize overlays/staging     # prévisualiser le rendu
+kubectl apply -k overlays/staging      # appliquer l'overlay
+```
+
+**Logique**
+- L'HPA a besoin de `resources.requests.cpu` sur les Pods cibles pour calculer un `%` — sinon la cible reste `<unknown>`.
+- **metrics-server requis** pour un vrai scaling ; à l'exam l'objet HPA (min/max/cible) peut suffire même si la métrique affiche `<unknown>`.
+- ⚠️ `kubectl apply -k` **ne purge pas** les ressources retirées du kustomize → supprime à la main l'objet en trop (`kubectl delete`).
+- Kustomize = `base` + overlays (patches par env) ; `kubectl kustomize <dir>` rend le YAML, `apply -k` l'applique.
+
+---
+
+## Q22 · kubectl top — usage ressources ⭐⭐
+
+**Énoncé type**
+> Show resource usage of nodes and of pods (per container). Write the Pod using the most memory in ns `prod` to a file.
+
+**Solution**
+```bash
+kubectl top nodes                              # CPU/mém par node
+kubectl top pod --containers -n prod           # détail par conteneur
+kubectl top pod -n prod --sort-by=memory       # trier par mémoire
+kubectl top pod -n prod --sort-by=memory --no-headers | head -1 | awk '{print $1}' > /opt/top-mem
+```
+
+**Logique**
+- `kubectl top` lit l'API `metrics.k8s.io` servie par le **metrics-server** → il doit être **installé et Ready**.
+- `--containers` = ligne par conteneur ; `--sort-by=cpu|memory` ; `-l <label>` pour filtrer.
+- `error: Metrics API not available` = metrics-server absent/pas prêt (≠ un souci de ton Pod).
+
+---
+
+## Q23 · Certs kubeadm — expiration & renew ⭐⭐
+
+**Énoncé type**
+> Find when the apiserver certificate expires, and renew all control-plane certificates.
+
+**Solution**
+```bash
+kubeadm certs check-expiration                                   # toutes les dates
+sudo openssl x509 -noout -enddate -in /etc/kubernetes/pki/apiserver.crt   # un cert précis
+
+sudo kubeadm certs renew apiserver        # renouveler un composant
+sudo kubeadm certs renew all              # … ou tout
+
+# Redémarrer les static pods du CP pour recharger les certs renouvelés :
+sudo mv /etc/kubernetes/manifests/*.yaml /tmp/   # le kubelet stoppe apiserver/cm/scheduler/etcd
+# (attendre quelques secondes)
+sudo mv /tmp/*.yaml /etc/kubernetes/manifests/   # le kubelet les recrée avec les nouveaux certs
+```
+
+**Logique**
+- `kubeadm certs check-expiration` = vue d'ensemble ; `openssl … -enddate` = le `notAfter` d'un cert donné (les deux doivent concorder).
+- `renew` régénère les fichiers **mais** les static pods tournent encore avec l'ancien → il faut les **redémarrer** (déplacer les manifests puis les remettre).
+- Un `kubeadm upgrade` **renouvelle** aussi les certs au passage. Les certs kubeadm durent **1 an**.
+
+---
+
+## Q24 · Gateway API — HTTPRoute ⭐⭐
+
+**Énoncé type**
+> Given a Gateway `edge-gw`, create an HTTPRoute routing `/web` → `web-svc:80`, `/shop` → `premium-svc:80` only if header `X-Tier: premium`, else `/shop` → `standard-svc:80`.
+
+**Solution**
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata: { name: route-splitter }
+spec:
+  parentRefs:
+    - name: edge-gw                       # rattachement au Gateway
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: /web }
+      backendRefs:
+        - { name: web-svc, port: 80 }
+    - matches:                            # path ET header dans le MÊME match = AND
+        - path: { type: PathPrefix, value: /shop }
+          headers:
+            - { name: X-Tier, value: premium }
+      backendRefs:
+        - { name: premium-svc, port: 80 }
+    - matches:                            # catch-all /shop APRÈS la règle spécifique
+        - path: { type: PathPrefix, value: /shop }
+      backendRefs:
+        - { name: standard-svc, port: 80 }
+```
+
+**Logique**
+- Gateway API (`gateway.networking.k8s.io/v1`) succède à l'Ingress ; `parentRefs` rattache la route au **Gateway**.
+- `pathType` ici = `PathPrefix`/`Exact`/`RegularExpression` (≠ Ingress `Prefix`/`Exact` — piège N11).
+- `path` **+** `headers` dans un **même** `match` = **ET** ; deux `matches` séparés = **OU**.
+- **L'ordre des règles compte** → mets la règle spécifique (avec header) **avant** le catch-all. Les Services n'ont pas besoin d'exister pour valider l'objet.
+
+---
+
+## Q25 · API depuis un Pod — token ServiceAccount ⭐⭐
+
+**Énoncé type**
+> From a Pod using ServiceAccount `probe-sa`, query the Kubernetes API to list Secrets in the namespace and save the JSON.
+
+**Solution**
+```yaml
+# Pod qui utilise la SA :
+apiVersion: v1
+kind: Pod
+metadata: { name: secret-probe }
+spec:
+  serviceAccountName: probe-sa
+  containers:
+    - { name: c, image: nginx:1-alpine }
+```
+```bash
+kubectl exec -it secret-probe -- sh
+# (dans le Pod ; nginx:alpine n'a pas curl → apk add --no-cache curl)
+SA=/var/run/secrets/kubernetes.io/serviceaccount
+TOKEN=$(cat $SA/token); NS=$(cat $SA/namespace)
+curl --cacert $SA/ca.crt -H "Authorization: Bearer $TOKEN" \
+  https://kubernetes.default.svc/api/v1/namespaces/$NS/secrets
+```
+
+**Logique**
+- Chaque Pod monte automatiquement **token + CA + namespace** sous `/var/run/secrets/kubernetes.io/serviceaccount/`.
+- L'API interne = `https://kubernetes.default.svc` (Service ClusterIP de l'apiserver) ; auth = header `Authorization: Bearer <token>` + `--cacert ca.crt`.
+- La SA doit avoir les **droits RBAC** (Role/RoleBinding), sinon `403 Forbidden`. Sans `serviceAccountName`, le Pod prend la SA `default` (souvent sans droits).
+
+---
+
+## Q26 · ServiceCIDR — étendre la plage d'IP ⭐
+
+**Énoncé type**
+> Without restarting kube-apiserver, add a new Service IP range `11.96.0.0/12` and give a Service a clusterIP from it.
+
+**Solution**
+```bash
+kubectl get servicecidr           # la plage "kubernetes" par défaut (IMMUABLE)
+```
+```yaml
+# Nouvelle plage :
+apiVersion: networking.k8s.io/v1
+kind: ServiceCIDR
+metadata: { name: extra-range }
+spec:
+  cidrs: [ "11.96.0.0/12" ]
+---
+# Service avec une clusterIP dans la nouvelle plage :
+apiVersion: v1
+kind: Service
+metadata: { name: range-svc2 }
+spec:
+  clusterIP: 11.96.0.10
+  selector: { app: range }
+  ports: [{ port: 80, targetPort: 80 }]
+```
+
+**Logique**
+- La ServiceCIDR par défaut est **immuable** → on **n'édite pas** `--service-cluster-ip-range` de l'apiserver ; on **ajoute** un objet `ServiceCIDR` (GA en v1.33+). Pas de redémarrage : l'allocateur prend la plage à chaud.
+- Un objet `IPAddress` est créé automatiquement pour chaque clusterIP attribuée.
+- `spec.clusterIP` est **immuable** après création → delete/recreate pour changer. Vérifier : `kubectl get svc range-svc2 -o wide`.
 
 ---
 
