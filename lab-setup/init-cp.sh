@@ -35,11 +35,15 @@ export KUBECONFIG=/etc/kubernetes/admin.conf
 
 kubectl create -f "https://raw.githubusercontent.com/projectcalico/calico/${CALICO_VERSION}/manifests/tigera-operator.yaml"
 
-# Attendre que le CRD Installation soit dispo
-until kubectl get crd installations.operator.tigera.io >/dev/null 2>&1; do
-  echo "En attente du CRD Installation..."
+# Attendre que les CRD tigera soient ÉTABLIES (servies par l'API), pas seulement créées.
+# `kubectl get crd` réussit dès que l'objet CRD existe, mais l'API server peut ne pas encore
+# servir le kind → « no matches for kind Installation ». `--for=condition=established` lève l'ambiguïté.
+until kubectl get crd installations.operator.tigera.io apiservers.operator.tigera.io >/dev/null 2>&1; do
+  echo "En attente des CRD tigera..."
   sleep 3
 done
+kubectl wait --for=condition=established --timeout=120s \
+  crd/installations.operator.tigera.io crd/apiservers.operator.tigera.io
 
 cat <<EOF | kubectl create -f -
 apiVersion: operator.tigera.io/v1

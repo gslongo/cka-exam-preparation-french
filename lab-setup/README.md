@@ -77,6 +77,18 @@ vagrant ssh cp1 -c "bash /vagrant/mock-exam/exam-01/setup.sh"
 > 💡 `setup.sh` (lancé sur cp1) nettoie les namespaces d'exam, le PV, le label de `w1`, dé-cordonne les workers et supprime le snapshot etcd. Le **static pod** vit sur le disque de `w1` : pour repartir propre, le retirer à la main → `vagrant ssh w1 -c "sudo rm -f /etc/kubernetes/manifests/static-web.yaml"`.
 > Aucun `vagrant destroy` n'est requis pour ces examens (tout se joue au niveau des objets K8s) ; pour l'**exam-02**, `setup.sh` retire en plus le taint de `w1` et le ClusterRole/Binding créés.
 
+## 🧪 Labs thématiques
+
+Le dossier [labs/](labs/) contient des **labs ciblés** sur un thème (à la différence des examens blancs qui balaient tout le programme). Chacun garde la même mécanique **auto-corrigée** (`LAB.md` + `setup.sh` + `grade.sh` + `solutions/`) mais sans limite de temps.
+
+- [labs/lab-services-ingress-gateway/](labs/lab-services-ingress-gateway/) — **Services · Ingress · Gateway API** (100 pts, objectif 75 %). Services testés en direct (connectivité) ; Ingress/Gateway notés sur l'objet (aucun contrôleur installé). Installe au besoin les CRD Gateway API.
+
+```bash
+# Préparer / se corriger (même principe que les examens)
+vagrant ssh cp1 -c "bash /vagrant/labs/lab-services-ingress-gateway/setup.sh"
+vagrant ssh cp1 -c "bash /vagrant/labs/lab-services-ingress-gateway/grade.sh"
+```
+
 ## Reset complet du cluster K8s (sans détruire les VMs)
 
 Sur cp1 puis chaque worker :
