@@ -24,8 +24,8 @@
 alias k=kubectl
 export do='--dry-run=client -o yaml'   # génère un manifest
 export now='--force --grace-period=0'  # delete immédiat
-source <(kubectl completion bash)
-complete -o default -F __start_kubectl k
+source <(kubectl completion bash)      # active l'autocomplétion kubectl (TAB)
+complete -o default -F __start_kubectl k  # étend l'autocomplétion à l'alias k
 
 # Contexte par défaut
 kubectl config set-context --current --namespace=<ns>
@@ -56,10 +56,13 @@ sudo chown $(id -u):$(id -g) $HOME/.kube/config
 | `k drain n1 --ignore-daemonsets --delete-emptydir-data` | Vide un node |
 | `k cordon n1` / `k uncordon n1` | Verrouille/déverrouille scheduling |
 | `k top pod -A` | Consommation (metrics-server) |
-| `k auth can-i <verb> <res> --as=<user>` | Test RBAC |
+| `k auth can-i <verb> <res> --as=<user>` | Test RBAC pour un **user** |
+| `k auth can-i <verb> <res> --as=system:serviceaccount:<ns>:<sa>` | Test RBAC pour un **ServiceAccount** (préfixe obligatoire) |
 | `k get ev --sort-by=.lastTimestamp` | Events triés |
 | `k debug node/n1 -it --image=busybox` | Ephemeral debug node |
 | `k debug pod/p -it --image=busybox --target=c` | Ephemeral debug container |
+
+> `<verb>` = l'action RBAC : `get`, `list`, `watch`, `create`, `update`, `patch`, `delete`, `deletecollection` (ou `*` = tout) · `<res>` = la ressource **au pluriel/exacte** : `pods`, `deployments`, `secrets`… (`k api-resources` pour la liste).
 
 ## 🧯 Problème → 1re commande à taper
 | Symptôme | Réflexe |
@@ -203,7 +206,11 @@ systemctl daemon-reload && systemctl restart kubelet
 # 4. Uncordon
 k uncordon <cp1>
 
-# 5. Répéter sur autres control plane (kubeadm upgrade node) puis workers
+# 5. Sur CHAQUE autre node (CP secondaires puis workers), même cycle :
+#    a) upgrade du PAQUET kubeadm (= début de l'étape 1, OBLIGATOIRE sur chaque node)
+#    b) kubeadm upgrade node   (au lieu de plan + apply)
+#    c) drain → kubelet/kubectl + restart → uncordon (étapes 2→4)
+#    → control plane UN PAR UN (quorum etcd)
 ```
 
 > ⚠️ **Ordre du `drain` — piège LFS258 vs officiel**
@@ -211,7 +218,7 @@ k uncordon <cp1>
 > - **LFS258** : place le drain **AVANT** `plan`/`apply` (plus prudent, mais non aligné).
 > - 👉 **En exam, suis l'ordre officiel** (ci-dessus). Le `kube-apiserver` est un static Pod → il tourne même node drainé, donc drainer avant `apply` n'apporte rien ; le drain sert à protéger les workloads **avant l'upgrade du kubelet**.
 >
-> **CP vs workers** :
+> **CP vs workers** — d'abord upgrade du **paquet** `kubeadm` sur **chaque** node, puis la sous-commande diffère :
 > - 1er control plane → `kubeadm upgrade apply v1.35.x`
 > - autres CP + **tous les workers** → `kubeadm upgrade node` (pas de `plan`, pas de `apply`)
 
