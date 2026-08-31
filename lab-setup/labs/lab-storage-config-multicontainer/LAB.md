@@ -97,7 +97,7 @@ Create a *Secret* **`db-credentials`** (type **`Opaque`**) with:
 > Expected: `db-credentials` of type `Opaque`, with `username` and `password` decoding to the right values.
 
 ### B3 — Inject the config as environment variables (10 pts)
-Create a *Pod* **`api`** (image `busybox:1.36`, kept alive) that receives:
+Create a *Pod* **`api`** (image `busybox:1.36`, kept alive — e.g. `sleep 100000`) that receives:
 
 - **all** the keys of `app-config` as env variables (**`envFrom`**);
 - a **`DB_PASSWORD`** variable whose value comes from the **`password`** key of the `db-credentials` Secret (**`secretKeyRef`**).
