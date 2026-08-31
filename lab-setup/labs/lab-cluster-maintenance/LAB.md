@@ -2,7 +2,7 @@
 
 > **CKA domain 01 — Cluster Architecture, Installation & Configuration (25%).**
 > An **operational** lab: you run real cluster-admin tasks and grade the *result*.
-> **100 pts · target ≥ 75 %.** All work is done **on cp1**.
+> **100 pts · target ≥ 75 %.** All work is done **on cp1**. **Estimated time: ~45 min – 1 h 15** (8 tasks).
 
 This lab complements the *Troubleshooting* lab (which repairs breakage): here you **operate**
 the cluster like an administrator — back up etcd, sign a certificate, wire up RBAC, take a

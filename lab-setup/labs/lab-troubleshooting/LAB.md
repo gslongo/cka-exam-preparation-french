@@ -4,7 +4,7 @@
 > it's up to you to **diagnose and fix**. The **16 breakages** cover **all 4 technical domains** of the CKA
 > (Architecture/Nodes, Workloads/Scheduling, Services/Networking, Storage): the point is precisely that
 > *troubleshooting is cross-cutting*.
-> **100 pts**, target **≥ 75 %**. No time limit — this is a practice lab.
+> **100 pts**, target **≥ 75 %**. No time limit — this is a practice lab. **Estimated time: ~1 h 30 – 2 h** (16 breakages).
 
 > 🧩 **Independence**: each breakage lives in **its own namespace** (`ts-arch`, `ts-nodes`, `ts-work`,
 > `ts-net`, `ts-netpol`, `ts-storage`) — you can tackle **just one** without breaking the others. **Two

@@ -2,7 +2,7 @@
 
 > **CKA domain 02 — Workloads & Scheduling (15%).**
 > A **build** lab: you author the objects and grade the *result*.
-> **100 pts · target ≥ 75 %.** All work is done **on cp1**.
+> **100 pts · target ≥ 75 %.** All work is done **on cp1**. **Estimated time: ~1 h – 1 h 30** (12 tasks).
 
 You will create Deployments and control a rollout, run a DaemonSet / Job / CronJob, add an
 HPA, tune QoS, and place pods precisely with `nodeSelector`, `nodeAffinity`, taints &

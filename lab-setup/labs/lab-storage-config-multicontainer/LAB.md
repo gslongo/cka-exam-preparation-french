@@ -4,7 +4,7 @@
 > persistence** — *storage* (PV/PVC/StorageClass), *config* (ConfigMap/Secrets)
 > and *multi-container Pods* (shared emptyDir, native sidecar).
 > The tasks are **nearly independent** and of increasing difficulty: you can play just one at a time.
-> **100 pts**, target **≥ 75 %**. No time limit — this is a practice lab.
+> **100 pts**, target **≥ 75 %**. No time limit — this is a practice lab. **Estimated time: ~1 h – 1 h 30** (10 tasks).
 
 > ⚠️ **No dynamic provisioner (CSI) is installed** (bare kubeadm cluster). The *StorageClass* in A1
 > is therefore graded on the **object** (its fields), like an Ingress with no controller. However, the

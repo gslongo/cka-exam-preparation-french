@@ -3,7 +3,7 @@
 > **Themed lab** (not a mock exam): it focuses on **traffic exposure**
 > across three layers — *Services* (L4), *Ingress* (L7 "legacy"), *Gateway API* (L7 modern).
 > The tasks are **independent** and of increasing difficulty: you can do just one at a time.
-> **100 pts**, target **≥ 75 %**. No time limit — this is a practice lab.
+> **100 pts**, target **≥ 75 %**. No time limit — this is a practice lab. **Estimated time: ~1 h – 1 h 30** (11 tasks).
 
 > ⚠️ **No Ingress or Gateway controller is installed** (as is often the case in the CKA): for these two
 > layers, the grader **grades the Kubernetes object** (correct declaration: class, hosts, paths,
