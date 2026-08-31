@@ -77,22 +77,22 @@ path **`/`** of type **`Prefix`**, to the *Service* **`web-svc`** port **80**.
 > Expected: `site` — `ingressClassName=lab-nginx`, host `web.cka.local`, path `/` (Prefix) → `web-svc:80`.
 
 ### B2 — "Fanout" multi-path Ingress (10 pts)
-Create an *Ingress* named `apps` for the host **`apps.cka.local`** that splits by path:
+Create an *Ingress* named `apps` (class `lab-nginx`) for the host **`apps.cka.local`** that splits by path:
 
 - **`/app`** (Prefix) → *Service* **`app-svc`** port **80** ;
 - **`/api`** (Prefix) → *Service* **`api-svc`** port **80**.
 
-> 💡 A single `host`, two entries under `http.paths`, each with its `pathType: Prefix` and its backend. Order doesn't matter here (disjoint paths).
-> Expected: `apps` — host `apps.cka.local`, `/app`→`app-svc:80` and `/api`→`api-svc:80` (Prefix).
+> 💡 A single `host`, two entries under `http.paths`, each with its `pathType: Prefix` and its backend. Order doesn't matter here (disjoint paths). Reflex: **always** set `ingressClassName` — without it (and without a default IngressClass), no controller adopts your Ingress.
+> Expected: `apps` — `ingressClassName=lab-nginx`, host `apps.cka.local`, `/app`→`app-svc:80` and `/api`→`api-svc:80` (Prefix).
 
 ### B3 — Ingress with TLS (10 pts)
 Secure a host with TLS:
 
 1. Create a TLS *Secret* named **`secure-tls`** (type `kubernetes.io/tls`) — a self-signed certificate for **`secure.cka.local`** is enough.
-2. Create an *Ingress* named `secure` for the host **`secure.cka.local`**, with a **`tls`** block referencing `secure-tls`, and a rule path **`/`** → *Service* **`web-svc`** port **80**.
+2. Create an *Ingress* named `secure` (class `lab-nginx`) for the host **`secure.cka.local`**, with a **`tls`** block referencing `secure-tls`, and a rule path **`/`** → *Service* **`web-svc`** port **80**.
 
 > 💡 Generate the pair with `openssl req -x509 -newkey rsa:2048 -nodes -keyout tls.key -out tls.crt -days 365 -subj "/CN=secure.cka.local"`, then `kubectl -n ingress-lab create secret tls secure-tls --cert=tls.crt --key=tls.key`. In the Ingress, `spec.tls: [{ hosts: [secure.cka.local], secretName: secure-tls }]`.
-> Expected: Secret `secure-tls` (TLS type); Ingress `secure` with `tls.secretName=secure-tls`, `tls.hosts[0]=secure.cka.local`, rule host `secure.cka.local` `/`→`web-svc:80`.
+> Expected: Secret `secure-tls` (TLS type); Ingress `secure` with `ingressClassName=lab-nginx`, `tls.secretName=secure-tls`, `tls.hosts[0]=secure.cka.local`, rule host `secure.cka.local` `/`→`web-svc:80`.
 
 ---
 

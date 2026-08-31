@@ -154,27 +154,32 @@ else
   fail 6 "B1b site — / (Prefix) → web-svc:80" $d "Ingress site missing"
 fi
 
-# ── B2 — Ingress fanout apps (host 2 + /app 4 + /api 4) ──
+# ── B2 — Ingress fanout apps (class+host 2 + /app 4 + /api 4) ──
 if kubectl -n $NS get ingress apps >/dev/null 2>&1; then
+  icn=$(kubectl -n $NS get ingress apps -o jsonpath='{.spec.ingressClassName}' 2>/dev/null)
   ho=$(kubectl -n $NS get ingress apps -o jsonpath='{.spec.rules[0].host}' 2>/dev/null)
-  if [ "$ho" = "apps.cka.local" ]; then
-    pass 2 "B2a apps — host apps.cka.local" $d
+  if [ "$icn" = "lab-nginx" ] && [ "$ho" = "apps.cka.local" ]; then
+    pass 2 "B2a apps — ingressClassName lab-nginx, host apps.cka.local" $d
   else
-    fail 2 "B2a apps — host apps.cka.local" $d "host=${ho:-absent}"
+    r=""
+    [ "$icn" = "lab-nginx" ]      || r+="ingressClassName=${icn:-absent}(≠lab-nginx); "
+    [ "$ho" = "apps.cka.local" ]  || r+="host=${ho:-absent}(≠apps.cka.local); "
+    fail 2 "B2a apps — class lab-nginx + host apps.cka.local" $d "${r%; }"
   fi
   trip=$(kubectl -n $NS get ingress apps -o jsonpath='{range .spec.rules[*].http.paths[*]}{.path}|{.pathType}|{.backend.service.name}:{.backend.service.port.number}{"\n"}{end}' 2>/dev/null)
-  if printf '%s' "$trip" | grep -qx '/app|Prefix|app-svc:80'; then
+  # Prefix pathType ignores a trailing slash: /app/ ≡ /app (Ingress spec).
+  if printf '%s' "$trip" | grep -qxE '/app/?\|Prefix\|app-svc:80'; then
     pass 4 "B2b apps — /app (Prefix) → app-svc:80" $d
   else
     fail 4 "B2b apps — /app Prefix to app-svc:80" $d "paths = $(printf '%s' "$trip" | tr '\n' ' ')"
   fi
-  if printf '%s' "$trip" | grep -qx '/api|Prefix|api-svc:80'; then
+  if printf '%s' "$trip" | grep -qxE '/api/?\|Prefix\|api-svc:80'; then
     pass 4 "B2c apps — /api (Prefix) → api-svc:80" $d
   else
     fail 4 "B2c apps — /api Prefix to api-svc:80" $d "paths = $(printf '%s' "$trip" | tr '\n' ' ')"
   fi
 else
-  fail 2 "B2a apps — host apps.cka.local" $d "Ingress apps missing from $NS"
+  fail 2 "B2a apps — class lab-nginx + host apps.cka.local" $d "Ingress apps missing from $NS"
   fail 4 "B2b apps — /app → app-svc:80" $d "Ingress apps missing"
   fail 4 "B2c apps — /api → api-svc:80" $d "Ingress apps missing"
 fi
@@ -187,15 +192,17 @@ else
   fail 3 "B3a secure-tls — Secret TLS (kubectl create secret tls)" $d "type=${sty:-absent}(≠kubernetes.io/tls)"
 fi
 if kubectl -n $NS get ingress secure >/dev/null 2>&1; then
+  icn=$(kubectl -n $NS get ingress secure -o jsonpath='{.spec.ingressClassName}' 2>/dev/null)
   tsec=$(kubectl -n $NS get ingress secure -o jsonpath='{.spec.tls[0].secretName}' 2>/dev/null)
   thost=$(kubectl -n $NS get ingress secure -o jsonpath='{.spec.tls[0].hosts[0]}' 2>/dev/null)
-  if [ "$tsec" = "secure-tls" ] && [ "$thost" = "secure.cka.local" ]; then
-    pass 4 "B3b secure — tls block (secretName secure-tls, host secure.cka.local)" $d
+  if [ "$icn" = "lab-nginx" ] && [ "$tsec" = "secure-tls" ] && [ "$thost" = "secure.cka.local" ]; then
+    pass 4 "B3b secure — class lab-nginx + tls block (secretName secure-tls, host secure.cka.local)" $d
   else
     r=""
+    [ "$icn" = "lab-nginx" ]          || r+="ingressClassName=${icn:-absent}(≠lab-nginx); "
     [ "$tsec" = "secure-tls" ]        || r+="tls.secretName=${tsec:-absent}(≠secure-tls); "
     [ "$thost" = "secure.cka.local" ] || r+="tls.hosts[0]=${thost:-absent}(≠secure.cka.local); "
-    fail 4 "B3b secure — tls block secretName+host" $d "${r%; }"
+    fail 4 "B3b secure — class lab-nginx + tls block secretName+host" $d "${r%; }"
   fi
   rho=$(kubectl -n $NS get ingress secure -o jsonpath='{.spec.rules[0].host}' 2>/dev/null)
   trip=$(kubectl -n $NS get ingress secure -o jsonpath='{range .spec.rules[0].http.paths[*]}{.path}|{.backend.service.name}:{.backend.service.port.number}{"\n"}{end}' 2>/dev/null)
@@ -205,7 +212,7 @@ if kubectl -n $NS get ingress secure >/dev/null 2>&1; then
     fail 3 "B3c secure — rule host + / to web-svc:80" $d "host=${rho:-absent} ; paths = $(printf '%s' "$trip" | tr '\n' ' ')"
   fi
 else
-  fail 4 "B3b secure — tls block secretName+host" $d "Ingress secure missing from $NS"
+  fail 4 "B3b secure — class lab-nginx + tls block secretName+host" $d "Ingress secure missing from $NS"
   fail 3 "B3c secure — rule host + backend" $d "Ingress secure missing"
 fi
 
