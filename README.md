@@ -55,60 +55,6 @@ CKA/                              ← workspace (ce dossier)
     └── labs/                      ← labs thématiques ciblés (ex. lab-services-ingress-gateway/)
 ```
 
-## 🧰 Ressources transverses
-
-- [00-cheatsheet.md](00-cheatsheet.md) — condensé imprimable (à relire J-1)
-- [QUESTIONS-EXAMEN.md](QUESTIONS-EXAMEN.md) — questions haute probabilité + solutions
-- [PIEGES-EXAMEN.md](PIEGES-EXAMEN.md) — pièges classiques tous chapitres
-- [shared/exam-strategy.md](shared/exam-strategy.md) — stratégie examen, Top 15, timing, bookmarks, PSI
-- [shared/kubectl-tips.md](shared/kubectl-tips.md) — réflexes kubectl, alias, JSONPath
-- [shared/yaml-snippets.md](shared/yaml-snippets.md) — YAML types prêts à copier
-- [shared/glossary.md](shared/glossary.md) — glossaire des termes K8s
-- [lab-setup/README.md](lab-setup/README.md) — monter un cluster kubeadm local (Vagrant, init K8s 1.34 → upgrade 1.35 à pratiquer, objectif version exam)
-- [lab-setup/mock-exam/exam-01/EXAM.md](lab-setup/mock-exam/exam-01/EXAM.md) — examen blanc auto-corrigé, niveau intermédiaire (16 tâches, `setup.sh` + `grade.sh`)
-- [lab-setup/mock-exam/exam-02/EXAM.md](lab-setup/mock-exam/exam-02/EXAM.md) — examen blanc auto-corrigé, **niveau avancé** (RBAC cluster-scoped, taints, NetworkPolicy default-deny, `subPath`…)
-- [lab-setup/mock-exam/exam-03/EXAM.md](lab-setup/mock-exam/exam-03/EXAM.md) — examen blanc auto-corrigé, **niveau expert** — drills ciblés killer.sh (Helm/cert-manager, HPA+Kustomize, Gateway API, egress, `crictl`, ServiceCIDR…)
-- [lab-setup/labs/lab-services-ingress-gateway/LAB.md](lab-setup/labs/lab-services-ingress-gateway/LAB.md) — **lab thématique** auto-corrigé : Services · Ingress · Gateway API (100 pts, objectif ≥ 75 %, `setup.sh` + `grade.sh`)
-- [lab-setup/labs/lab-storage-config-multicontainer/LAB.md](lab-setup/labs/lab-storage-config-multicontainer/LAB.md) — **lab thématique** auto-corrigé : Stockage · ConfigMap/Secrets · Sidecars (100 pts, objectif ≥ 75 %, `setup.sh` + `grade.sh`)
-- [lab-setup/labs/lab-troubleshooting/LAB.md](lab-setup/labs/lab-troubleshooting/LAB.md) — **lab thématique** auto-corrigé : 🔧 Troubleshooting transverse — 16 pannes tous domaines à diagnostiquer et réparer (100 pts, objectif ≥ 75 %, `setup.sh` + `grade.sh`)
-- [lab-setup/labs/lab-cluster-maintenance/LAB.md](lab-setup/labs/lab-cluster-maintenance/LAB.md) — **lab thématique** auto-corrigé : 🛠️ Cluster Maintenance, etcd & Security — backup/restore etcd, approbation CSR, RBAC, drain de noeud, static pod (domaine 01) (100 pts, objectif ≥ 75 %, `setup.sh` + `grade.sh`)
-- [lab-setup/labs/lab-workloads-scheduling/LAB.md](lab-setup/labs/lab-workloads-scheduling/LAB.md) — **lab thématique** auto-corrigé : 📦 Workloads & Scheduling — Deployments/rollout, DaemonSet/Job/CronJob, HPA, QoS, nodeSelector/affinity/taints/topology spread/PriorityClass (domaine 02) (100 pts, objectif ≥ 75 %, `setup.sh` + `grade.sh`)
-
-## 🎯 Examens blancs CKA
-
-Trois examens blancs complets **auto-corrigés** tournent sur le [lab local](lab-setup/README.md). Chaque sujet vit dans son sous-dossier.
-
-- **exam-01** & **exam-02** — format « vrai CKA » : **16 tâches, 100 pts, seuil 66 %, ~2 h**, pondérés par domaine (Troubleshooting 30 % · Cluster Architecture 25 % · Réseau 20 % · Workloads 15 % · Storage 10 %).
-- **exam-03** — format « killer.sh » : **drills ciblés** qui comblent les sujets pointus rencontrés sur killer.sh (mapping ~1:1 avec ses questions), au-delà de ce que couvrent exam-01/02.
-
-Détail des niveaux :
-
-- **exam-01** — niveau intermédiaire : RBAC namespacé, snapshot etcd, static pod, cordon, ConfigMap→env, NodePort, NetworkPolicy simple, PV/PVC…
-- **exam-02** — **niveau avancé** : RBAC *cluster-scoped*, scheduling manuel, taints/tolerations, Secret→env, NetworkPolicy *default-deny*, `reclaimPolicy`/`subPath`, troubleshooting moins évident (sonde, dérive de labels, contrainte de placement, Secret manquant).
-- **exam-03** — **niveau expert (drills killer.sh)** : extraction kubeconfig, Helm + cert-manager + ClusterIssuer, StatefulSet scale, QoS, **HPA + Kustomize**, PV/PVC monté par Deployment, `kubectl top`, upgrade worker + `kubeadm join`, API depuis un Pod, DaemonSet, anti-affinité multi-conteneurs, **Gateway API** (chemin + en-tête), `kubeadm certs renew`, **NetworkPolicy egress** (enforcement runtime), CoreDNS, `crictl`, introspection etcd, kube-proxy iptables, **Service CIDR** multi-range.
-
-| Sujet | Fichiers |
-|---|---|
-| **exam-01** (intermédiaire) | [EXAM.md](lab-setup/mock-exam/exam-01/EXAM.md) · [solutions/SOLUTIONS.md](lab-setup/mock-exam/exam-01/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/mock-exam/exam-01/setup.sh) · [grade.sh](lab-setup/mock-exam/exam-01/grade.sh) |
-| **exam-02** (avancé) | [EXAM.md](lab-setup/mock-exam/exam-02/EXAM.md) · [solutions/SOLUTIONS.md](lab-setup/mock-exam/exam-02/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/mock-exam/exam-02/setup.sh) · [grade.sh](lab-setup/mock-exam/exam-02/grade.sh) |
-| **exam-03** (expert — killer.sh) | [EXAM.md](lab-setup/mock-exam/exam-03/EXAM.md) · [solutions/SOLUTIONS.md](lab-setup/mock-exam/exam-03/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/mock-exam/exam-03/setup.sh) · [grade.sh](lab-setup/mock-exam/exam-03/grade.sh) |
-
-Dans chaque sujet : `EXAM.md` = **questions seules** · `solutions/SOLUTIONS.md` = corrigé (à n'ouvrir **qu'après**) · `setup.sh` = amorce **idempotente** · `grade.sh` = correcteur **automatique** (score + verdict par domaine).
-
-> ▶️ **Mode d'emploi** (commandes `vagrant`) : voir [lab-setup/README.md](lab-setup/README.md).
-
-## 🧪 Labs thématiques
-
-À la différence des examens blancs (qui balaient tout le programme), les **labs thématiques** creusent **un sujet** en profondeur. Même mécanique auto-corrigée (`LAB.md` + `setup.sh` + `grade.sh` + `solutions/`), sans limite de temps.
-
-| Lab | Contenu | Barème |
-|---|---|---|
-| **Services · Ingress · Gateway API**<br>[LAB.md](lab-setup/labs/lab-services-ingress-gateway/LAB.md) · [solutions/](lab-setup/labs/lab-services-ingress-gateway/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/labs/lab-services-ingress-gateway/setup.sh) · [grade.sh](lab-setup/labs/lab-services-ingress-gateway/grade.sh) | Exposition du trafic L4→L7 : ClusterIP/NodePort/headless, Service sans selector + Endpoints, réparation de Service, Ingress (host/path, fanout, TLS), Gateway API (HTTPRoute préfixe, header-match, canary pondéré) | 100 pts · ≥ 75 % |
-| **Stockage · ConfigMap/Secrets · Sidecars**<br>[LAB.md](lab-setup/labs/lab-storage-config-multicontainer/LAB.md) · [solutions/](lab-setup/labs/lab-storage-config-multicontainer/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/labs/lab-storage-config-multicontainer/setup.sh) · [grade.sh](lab-setup/labs/lab-storage-config-multicontainer/grade.sh) | Persistance & configuration : StorageClass, binding statique PV/PVC, récupération d'un PV `Released` (claimRef), ConfigMap/Secrets (`envFrom`, `secretKeyRef`, volume), `emptyDir` partagé, sidecar natif (initContainer `restartPolicy: Always`) | 100 pts · ≥ 75 % |
-| **🔧 Troubleshooting transverse**<br>[LAB.md](lab-setup/labs/lab-troubleshooting/LAB.md) · [solutions/](lab-setup/labs/lab-troubleshooting/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/labs/lab-troubleshooting/setup.sh) · [grade.sh](lab-setup/labs/lab-troubleshooting/grade.sh) | **Tout est cassé, à réparer** — 16 pannes sur les 4 domaines : RBAC, static pod (`cp1`), noeud `w1` cordonné+taint, finalizer `Terminating`, `ImagePull`/`CrashLoop`/`CreateContainerConfigError`, `Pending` (ressources/nodeSelector), readiness, selector/`targetPort`/NetworkPolicy/`dnsPolicy`, PVC `Pending`/manquante. Testé en direct (trafic, DNS) | 100 pts · ≥ 75 % |
-| **🛠️ Cluster Maintenance, etcd & Security**<br>[LAB.md](lab-setup/labs/lab-cluster-maintenance/LAB.md) · [solutions/](lab-setup/labs/lab-cluster-maintenance/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/labs/lab-cluster-maintenance/setup.sh) · [grade.sh](lab-setup/labs/lab-cluster-maintenance/grade.sh) | *Domaine 01 (25 %)* — **opérations d'admin** : backup/restore etcd (`etcdctl`/`etcdutl` via `exec`), approbation de CSR client, `kubeadm certs check-expiration`, ClusterRole/Role RBAC (`auth can-i`), `drain` de noeud, static pod sur `cp1` | 100 pts · ≥ 75 % |
-| **📦 Workloads & Scheduling**<br>[LAB.md](lab-setup/labs/lab-workloads-scheduling/LAB.md) · [solutions/](lab-setup/labs/lab-workloads-scheduling/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/labs/lab-workloads-scheduling/setup.sh) · [grade.sh](lab-setup/labs/lab-workloads-scheduling/grade.sh) | *Domaine 02 (15 %)* — **build de workloads** : Deployment + scale, stratégie `RollingUpdate`, DaemonSet (tolérations), Job/CronJob, HPA, QoS `Guaranteed`, `nodeSelector`, `nodeAffinity`, taint+toleration, `topologySpreadConstraints`, `PriorityClass` | 100 pts · ≥ 75 % |
-
 ## 📚 Domaines & pondération CKA (curriculum CNCF)
 
 | # | Domaine | Poids | Fiche |
@@ -177,6 +123,60 @@ Tu connais l'admin. Il te reste la **vitesse**, le **format** et quelques **méc
 | S6 | Storage ([04](04-storage.md)) + CSI | PVC static + dynamic |
 | S7 | Troubleshooting ([05](05-troubleshooting.md)) | Logs, events, `crictl`, etcd backup/restore |
 | S8 | [exam-03](lab-setup/mock-exam/exam-03/EXAM.md) (drills experts) + killer.sh + [00-cheatsheet.md](00-cheatsheet.md) | Mock exam ×3, timing < 2 h |
+
+## 🧪 Labs thématiques
+
+À la différence des examens blancs (qui balaient tout le programme), les **labs thématiques** creusent **un sujet** en profondeur. Même mécanique auto-corrigée (`LAB.md` + `setup.sh` + `grade.sh` + `solutions/`), sans limite de temps.
+
+| Lab | Contenu | Barème |
+|---|---|---|
+| **Services · Ingress · Gateway API**<br>[LAB.md](lab-setup/labs/lab-services-ingress-gateway/LAB.md) · [solutions/](lab-setup/labs/lab-services-ingress-gateway/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/labs/lab-services-ingress-gateway/setup.sh) · [grade.sh](lab-setup/labs/lab-services-ingress-gateway/grade.sh) | Exposition du trafic L4→L7 : ClusterIP/NodePort/headless, Service sans selector + Endpoints, réparation de Service, Ingress (host/path, fanout, TLS), Gateway API (HTTPRoute préfixe, header-match, canary pondéré) | 100 pts · ≥ 75 % |
+| **Stockage · ConfigMap/Secrets · Sidecars**<br>[LAB.md](lab-setup/labs/lab-storage-config-multicontainer/LAB.md) · [solutions/](lab-setup/labs/lab-storage-config-multicontainer/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/labs/lab-storage-config-multicontainer/setup.sh) · [grade.sh](lab-setup/labs/lab-storage-config-multicontainer/grade.sh) | Persistance & configuration : StorageClass, binding statique PV/PVC, récupération d'un PV `Released` (claimRef), ConfigMap/Secrets (`envFrom`, `secretKeyRef`, volume), `emptyDir` partagé, sidecar natif (initContainer `restartPolicy: Always`) | 100 pts · ≥ 75 % |
+| **🔧 Troubleshooting transverse**<br>[LAB.md](lab-setup/labs/lab-troubleshooting/LAB.md) · [solutions/](lab-setup/labs/lab-troubleshooting/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/labs/lab-troubleshooting/setup.sh) · [grade.sh](lab-setup/labs/lab-troubleshooting/grade.sh) | **Tout est cassé, à réparer** — 16 pannes sur les 4 domaines : RBAC, static pod (`cp1`), noeud `w1` cordonné+taint, finalizer `Terminating`, `ImagePull`/`CrashLoop`/`CreateContainerConfigError`, `Pending` (ressources/nodeSelector), readiness, selector/`targetPort`/NetworkPolicy/`dnsPolicy`, PVC `Pending`/manquante. Testé en direct (trafic, DNS) | 100 pts · ≥ 75 % |
+| **🛠️ Cluster Maintenance, etcd & Security**<br>[LAB.md](lab-setup/labs/lab-cluster-maintenance/LAB.md) · [solutions/](lab-setup/labs/lab-cluster-maintenance/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/labs/lab-cluster-maintenance/setup.sh) · [grade.sh](lab-setup/labs/lab-cluster-maintenance/grade.sh) | *Domaine 01 (25 %)* — **opérations d'admin** : backup/restore etcd (`etcdctl`/`etcdutl` via `exec`), approbation de CSR client, `kubeadm certs check-expiration`, ClusterRole/Role RBAC (`auth can-i`), `drain` de noeud, static pod sur `cp1` | 100 pts · ≥ 75 % |
+| **📦 Workloads & Scheduling**<br>[LAB.md](lab-setup/labs/lab-workloads-scheduling/LAB.md) · [solutions/](lab-setup/labs/lab-workloads-scheduling/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/labs/lab-workloads-scheduling/setup.sh) · [grade.sh](lab-setup/labs/lab-workloads-scheduling/grade.sh) | *Domaine 02 (15 %)* — **build de workloads** : Deployment + scale, stratégie `RollingUpdate`, DaemonSet (tolérations), Job/CronJob, HPA, QoS `Guaranteed`, `nodeSelector`, `nodeAffinity`, taint+toleration, `topologySpreadConstraints`, `PriorityClass` | 100 pts · ≥ 75 % |
+
+## 🎯 Examens blancs CKA
+
+Trois examens blancs complets **auto-corrigés** tournent sur le [lab local](lab-setup/README.md). Chaque sujet vit dans son sous-dossier.
+
+- **exam-01** & **exam-02** — format « vrai CKA » : **16 tâches, 100 pts, seuil 66 %, ~2 h**, pondérés par domaine (Troubleshooting 30 % · Cluster Architecture 25 % · Réseau 20 % · Workloads 15 % · Storage 10 %).
+- **exam-03** — format « killer.sh » : **drills ciblés** qui comblent les sujets pointus rencontrés sur killer.sh (mapping ~1:1 avec ses questions), au-delà de ce que couvrent exam-01/02.
+
+Détail des niveaux :
+
+- **exam-01** — niveau intermédiaire : RBAC namespacé, snapshot etcd, static pod, cordon, ConfigMap→env, NodePort, NetworkPolicy simple, PV/PVC…
+- **exam-02** — **niveau avancé** : RBAC *cluster-scoped*, scheduling manuel, taints/tolerations, Secret→env, NetworkPolicy *default-deny*, `reclaimPolicy`/`subPath`, troubleshooting moins évident (sonde, dérive de labels, contrainte de placement, Secret manquant).
+- **exam-03** — **niveau expert (drills killer.sh)** : extraction kubeconfig, Helm + cert-manager + ClusterIssuer, StatefulSet scale, QoS, **HPA + Kustomize**, PV/PVC monté par Deployment, `kubectl top`, upgrade worker + `kubeadm join`, API depuis un Pod, DaemonSet, anti-affinité multi-conteneurs, **Gateway API** (chemin + en-tête), `kubeadm certs renew`, **NetworkPolicy egress** (enforcement runtime), CoreDNS, `crictl`, introspection etcd, kube-proxy iptables, **Service CIDR** multi-range.
+
+| Sujet | Fichiers |
+|---|---|
+| **exam-01** (intermédiaire) | [EXAM.md](lab-setup/mock-exam/exam-01/EXAM.md) · [solutions/SOLUTIONS.md](lab-setup/mock-exam/exam-01/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/mock-exam/exam-01/setup.sh) · [grade.sh](lab-setup/mock-exam/exam-01/grade.sh) |
+| **exam-02** (avancé) | [EXAM.md](lab-setup/mock-exam/exam-02/EXAM.md) · [solutions/SOLUTIONS.md](lab-setup/mock-exam/exam-02/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/mock-exam/exam-02/setup.sh) · [grade.sh](lab-setup/mock-exam/exam-02/grade.sh) |
+| **exam-03** (expert — killer.sh) | [EXAM.md](lab-setup/mock-exam/exam-03/EXAM.md) · [solutions/SOLUTIONS.md](lab-setup/mock-exam/exam-03/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/mock-exam/exam-03/setup.sh) · [grade.sh](lab-setup/mock-exam/exam-03/grade.sh) |
+
+Dans chaque sujet : `EXAM.md` = **questions seules** · `solutions/SOLUTIONS.md` = corrigé (à n'ouvrir **qu'après**) · `setup.sh` = amorce **idempotente** · `grade.sh` = correcteur **automatique** (score + verdict par domaine).
+
+> ▶️ **Mode d'emploi** (commandes `vagrant`) : voir [lab-setup/README.md](lab-setup/README.md).
+
+## 🧰 Ressources transverses
+
+- [00-cheatsheet.md](00-cheatsheet.md) — condensé imprimable (à relire J-1)
+- [QUESTIONS-EXAMEN.md](QUESTIONS-EXAMEN.md) — questions haute probabilité + solutions
+- [PIEGES-EXAMEN.md](PIEGES-EXAMEN.md) — pièges classiques tous chapitres
+- [shared/exam-strategy.md](shared/exam-strategy.md) — stratégie examen, Top 15, timing, bookmarks, PSI
+- [shared/kubectl-tips.md](shared/kubectl-tips.md) — réflexes kubectl, alias, JSONPath
+- [shared/yaml-snippets.md](shared/yaml-snippets.md) — YAML types prêts à copier
+- [shared/glossary.md](shared/glossary.md) — glossaire des termes K8s
+- [lab-setup/README.md](lab-setup/README.md) — monter un cluster kubeadm local (Vagrant, init K8s 1.34 → upgrade 1.35 à pratiquer, objectif version exam)
+- [lab-setup/mock-exam/exam-01/EXAM.md](lab-setup/mock-exam/exam-01/EXAM.md) — examen blanc auto-corrigé, niveau intermédiaire (16 tâches, `setup.sh` + `grade.sh`)
+- [lab-setup/mock-exam/exam-02/EXAM.md](lab-setup/mock-exam/exam-02/EXAM.md) — examen blanc auto-corrigé, **niveau avancé** (RBAC cluster-scoped, taints, NetworkPolicy default-deny, `subPath`…)
+- [lab-setup/mock-exam/exam-03/EXAM.md](lab-setup/mock-exam/exam-03/EXAM.md) — examen blanc auto-corrigé, **niveau expert** — drills ciblés killer.sh (Helm/cert-manager, HPA+Kustomize, Gateway API, egress, `crictl`, ServiceCIDR…)
+- [lab-setup/labs/lab-services-ingress-gateway/LAB.md](lab-setup/labs/lab-services-ingress-gateway/LAB.md) — **lab thématique** auto-corrigé : Services · Ingress · Gateway API (100 pts, objectif ≥ 75 %, `setup.sh` + `grade.sh`)
+- [lab-setup/labs/lab-storage-config-multicontainer/LAB.md](lab-setup/labs/lab-storage-config-multicontainer/LAB.md) — **lab thématique** auto-corrigé : Stockage · ConfigMap/Secrets · Sidecars (100 pts, objectif ≥ 75 %, `setup.sh` + `grade.sh`)
+- [lab-setup/labs/lab-troubleshooting/LAB.md](lab-setup/labs/lab-troubleshooting/LAB.md) — **lab thématique** auto-corrigé : 🔧 Troubleshooting transverse — 16 pannes tous domaines à diagnostiquer et réparer (100 pts, objectif ≥ 75 %, `setup.sh` + `grade.sh`)
+- [lab-setup/labs/lab-cluster-maintenance/LAB.md](lab-setup/labs/lab-cluster-maintenance/LAB.md) — **lab thématique** auto-corrigé : 🛠️ Cluster Maintenance, etcd & Security — backup/restore etcd, approbation CSR, RBAC, drain de noeud, static pod (domaine 01) (100 pts, objectif ≥ 75 %, `setup.sh` + `grade.sh`)
+- [lab-setup/labs/lab-workloads-scheduling/LAB.md](lab-setup/labs/lab-workloads-scheduling/LAB.md) — **lab thématique** auto-corrigé : 📦 Workloads & Scheduling — Deployments/rollout, DaemonSet/Job/CronJob, HPA, QoS, nodeSelector/affinity/taints/topology spread/PriorityClass (domaine 02) (100 pts, objectif ≥ 75 %, `setup.sh` + `grade.sh`)
 
 ## 🔗 Ressources autorisées jour J
 
