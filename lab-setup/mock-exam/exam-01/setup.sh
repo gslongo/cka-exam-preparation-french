@@ -130,7 +130,7 @@ spec:
   containers:
   - name: web
     image: ${GOOD_IMG}
-    resources: { requests: { memory: "100Gi", cpu: "50" } }   # BUG : inschedulable
+    resources: { requests: { memory: "100Gi", cpu: "50" } }   # BUG: unschedulable
 EOF
 
 # T16 — Deployment stuck: missing volume ConfigMap (CreateContainerConfigError)

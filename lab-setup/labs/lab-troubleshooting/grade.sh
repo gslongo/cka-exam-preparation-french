@@ -35,9 +35,10 @@ d=ARCH
 phase=$(jp get pod ts-static-cp1 -n default -o jsonpath='{.status.phase}')
 img=$(jp get pod ts-static-cp1 -n default -o jsonpath='{.spec.containers[0].image}')
 owner=$(jp get pod ts-static-cp1 -n default -o jsonpath='{.metadata.ownerReferences[0].kind}')
-if [ "$phase" = "Running" ] && printf '%s' "$img" | grep -q 'nginx:1.29-alpine' && [ "$owner" = "Node" ]; then
+# Any pullable image is accepted (Running proves it) — the statement only asks for "a valid image".
+if [ "$phase" = "Running" ] && [ "$owner" = "Node" ]; then
   pass 8 "A2 static pod — ts-static-cp1 Running (image fixed)" $d
-else fail 8 "A2 static pod — fix the static manifest on cp1 (pod Running)" $d "phase=${phase:-absent}, image=${img:-∅}, owner=${owner:-?} (expected Running/nginx:1.29-alpine/Node)"; fi
+else fail 8 "A2 static pod — fix the static manifest on cp1 (pod Running)" $d "phase=${phase:-absent}, image=${img:-∅}, owner=${owner:-?} (expected Running, owner Node)"; fi
 
 # A3 — node w1 back in service, billing scheduled (8)
 d=ARCH
@@ -66,7 +67,8 @@ dom WORK 32 "📦 Workloads & Scheduling"
 d=WORK
 img=$(jp -n ts-work get deploy web -o jsonpath='{.spec.template.spec.containers[0].image}')
 avail=$(jp -n ts-work get deploy web -o jsonpath='{.status.availableReplicas}')
-if printf '%s' "$img" | grep -q 'nginx:1.29-alpine' && [ "${avail:-0}" -ge 1 ]; then
+# Any pullable image is accepted (availableReplicas proves it) — the statement only asks for "a valid image".
+if [ "${avail:-0}" -ge 1 ]; then
   pass 6 "W1 image — deploy web fixed and available" $d
 else fail 6 "W1 image — fix the image of 'web' (pods Running)" $d "image=${img:-∅}, availableReplicas=${avail:-0}"; fi
 

@@ -103,7 +103,7 @@ metadata:
 spec:
   containers:
   - name: web
-    image: ${BAD_IMG}          # BUG : tag inexistant
+    image: ${BAD_IMG}          # BUG: nonexistent tag
     ports: [{ containerPort: 80 }]
 EOF
 
@@ -144,7 +144,7 @@ spec:
     metadata: { labels: { app: web } }
     spec:
       containers:
-      - { name: web, image: ${BAD_IMG} }   # BUG : tag inexistant
+      - { name: web, image: ${BAD_IMG} }   # BUG: nonexistent tag
 EOF
 
 # W2 — CrashLoopBackOff (command that exits with an error).
@@ -188,7 +188,7 @@ spec:
   containers:
   - name: c
     image: ${GOOD_IMG}
-    resources: { requests: { memory: "100Gi", cpu: "40" } }   # BUG : inschedulable
+    resources: { requests: { memory: "100Gi", cpu: "40" } }   # BUG: unschedulable
 EOF
 
 # W5 — Pending (nodeSelector matching no node).

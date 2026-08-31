@@ -80,8 +80,8 @@ The *Pod* **`crasher`** keeps restarting. Make it stay `Running`.
 
 ### W3 — `CreateContainerConfigError` (6 pts)
 The *Pod* **`checkout`** fails to create its container: it injects `DB_PASSWORD` from a *Secret*, but
-**a key is missing**. Fix it so it starts with the variable present.
-> 💡 `describe pod checkout` (Events). Goal: `checkout` **`Running`** with `DB_PASSWORD` properly injected.
+**a key is missing**. Fix it so it starts with the variable present (**non-empty** value).
+> 💡 `describe pod checkout` (Events). Goal: `checkout` **`Running`** with `DB_PASSWORD` properly injected (non-empty).
 
 ### W4 — `Pending` (resources) (5 pts)
 The *Pod* **`report`** stays `Pending`: nothing can host it. Make it `Running`.
@@ -115,7 +115,7 @@ the routing.
 ### N3 — Traffic blocked by a NetworkPolicy (7 pts) · ns `ts-netpol`
 In `ts-netpol`, the Pod **`client`** can no longer reach **`backend`**: a *NetworkPolicy* blocks everything.
 Allow the **`client → backend`** flow (without re-opening everything).
-> 💡 `kubectl -n ts-netpol get netpol`; test `exec client -- wget -T4 -qO- http://backend`.
+> 💡 `kubectl -n ts-netpol get netpol`; test `kubectl -n ts-netpol exec client -- wget -T4 -qO- http://backend`.
 > Goal: `client` **reaches** `backend` (traffic flows).
 
 ### N4 — Broken DNS resolution (5 pts) · ns `ts-net`
