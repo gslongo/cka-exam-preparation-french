@@ -15,7 +15,7 @@
 
 > 🧪 **Labs thématiques auto-corrigés** : [Services · Ingress · Gateway API](lab-setup/labs/lab-services-ingress-gateway/LAB.md) · [Stockage · ConfigMap/Secrets · Sidecars](lab-setup/labs/lab-storage-config-multicontainer/LAB.md) · [🔧 Troubleshooting transverse](lab-setup/labs/lab-troubleshooting/LAB.md) · [🛠️ Cluster & etcd](lab-setup/labs/lab-cluster-maintenance/LAB.md) · [📦 Workloads & Scheduling](lab-setup/labs/lab-workloads-scheduling/LAB.md) — un sujet en profondeur (100 pts, seuil 75 %)
 
-> 🇬🇧 **Labs & examens blancs en anglais (volontaire)** : les énoncés (`LAB.md` / `EXAM.md`), les solutions et les correcteurs des **labs thématiques** et des **examens blancs** sont **volontairement rédigés en anglais**, dans le style des énoncés officiels de la CKA — pour t'habituer au vocabulaire et à la formulation le jour J. **Tout le reste du dépôt reste en français** (fiches de révision, stratégie, glossaire, checklists).
+> 🇬🇧 **Dossier `lab-setup/` en anglais (volontaire)** : tout le contenu de [lab-setup/](lab-setup/) — sa doc ([lab-setup/README.md](lab-setup/README.md)), les énoncés (`LAB.md` / `EXAM.md`), les solutions et les correcteurs des **labs thématiques** et des **examens blancs** — est **volontairement rédigé en anglais**, dans le style des énoncés officiels de la CKA, pour t'habituer au vocabulaire et à la formulation le jour J. **Tout le reste du dépôt reste en français** (fiches de révision, stratégie, glossaire, checklists).
 
 > 🧭 **Par où commencer selon ton niveau** : [parcours express](#-parcours-express-selon-ton-niveau) (« débutant complet », « managé/cloud EKS·GKE·AKS » ou « K8s déjà avancé »)
 
