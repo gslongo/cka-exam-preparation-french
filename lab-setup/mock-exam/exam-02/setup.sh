@@ -8,6 +8,9 @@
 # No "vagrant destroy" needed: everything happens at the K8s object level.
 set -uo pipefail
 
+# Health gate: API/nodes/CNI + auto-repair of the expired Calico token (snapshot restore).
+bash /vagrant/check-cluster-health.sh || exit 1
+
 GOOD_IMG="nginx:1.29-alpine"     # valid image
 BUSYBOX="busybox:1.36"
 

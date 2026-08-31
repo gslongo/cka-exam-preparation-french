@@ -6,6 +6,9 @@
 # then re-seeds the starting state. Contains NO solution.
 set -uo pipefail
 
+# Health gate: API/nodes/CNI + auto-repair of the expired Calico token (snapshot restore).
+bash /vagrant/check-cluster-health.sh || exit 1
+
 BASE=/opt/sig-lab
 AGN=registry.k8s.io/e2e-test-images/agnhost:2.53
 

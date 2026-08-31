@@ -7,6 +7,9 @@
 # Contains NO solution: only the starting state.
 set -uo pipefail
 
+# Health gate: API/nodes/CNI + auto-repair of the expired Calico token (snapshot restore).
+bash /vagrant/check-cluster-health.sh || exit 1
+
 GOOD_IMG="nginx:1.29-alpine"     # valid image
 BAD_IMG="nginx:1.29-nope"        # nonexistent tag (broken-image exercise)
 BUSYBOX="busybox:1.36"

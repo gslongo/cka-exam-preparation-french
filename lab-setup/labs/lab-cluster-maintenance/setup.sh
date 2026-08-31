@@ -8,6 +8,9 @@
 # a graded/solved state) and then re-seeds the initial state. It contains NO solutions.
 set -uo pipefail
 
+# Health gate: API/nodes/CNI + auto-repair of the expired Calico token (snapshot restore).
+bash /vagrant/check-cluster-health.sh || exit 1
+
 GOOD_IMG="nginx:1.29-alpine"
 NSES="finance legacy"
 STATIC_MANIFEST="/etc/kubernetes/manifests/web-static.yaml"

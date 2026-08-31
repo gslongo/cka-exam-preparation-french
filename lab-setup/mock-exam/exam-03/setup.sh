@@ -6,6 +6,9 @@
 # the starting state. Contains NO solution.
 set -uo pipefail
 
+# Health gate: API/nodes/CNI + auto-repair of the expired Calico token (snapshot restore).
+bash /vagrant/check-cluster-health.sh || exit 1
+
 BASE=/opt/exam-03
 
 echo "🧹 Cleaning up the previous state (idempotent)…"

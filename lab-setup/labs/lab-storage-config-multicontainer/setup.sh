@@ -6,6 +6,9 @@
 # then re-seeds the starting state. Contains NO solution.
 set -uo pipefail
 
+# Health gate: API/nodes/CNI + auto-repair of the expired Calico token (snapshot restore).
+bash /vagrant/check-cluster-health.sh || exit 1
+
 echo "🧹 Cleaning up the previous state (idempotent)…"
 kubectl delete ns storage-lab config-lab multi-lab --ignore-not-found >/dev/null 2>&1 || true
 kubectl wait --for=delete ns/storage-lab ns/config-lab ns/multi-lab --timeout=120s >/dev/null 2>&1 || true

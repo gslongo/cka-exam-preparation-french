@@ -8,6 +8,9 @@
 # (see LAB.md). Idempotent: undoes any previous run, then re-seeds. Contains NO solutions.
 set -uo pipefail
 
+# Health gate: API/nodes/CNI + auto-repair of the expired Calico token (snapshot restore).
+bash /vagrant/check-cluster-health.sh || exit 1
+
 GOOD_IMG="nginx:1.29-alpine"
 NSES="w-deploy w-ds w-batch w-hpa w-res w-sched w-taint w-spread w-prio"
 
