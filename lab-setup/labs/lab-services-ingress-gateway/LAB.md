@@ -1,135 +1,135 @@
 # 🌐 Lab — Services · Ingress · Gateway API
 
-> **Lab thématique** (pas un examen blanc) : il se concentre sur l'**exposition du trafic**
-> en trois couches — *Services* (L4), *Ingress* (L7 « historique »), *Gateway API* (L7 moderne).
-> Les tâches sont **indépendantes** et de difficulté progressive : tu peux en jouer une seule à la fois.
-> **100 pts**, objectif **≥ 75 %**. Pas de limite de temps — c'est un lab d'entraînement.
+> **Themed lab** (not a mock exam): it focuses on **traffic exposure**
+> across three layers — *Services* (L4), *Ingress* (L7 "legacy"), *Gateway API* (L7 modern).
+> The tasks are **independent** and of increasing difficulty: you can do just one at a time.
+> **100 pts**, target **≥ 75 %**. No time limit — this is a practice lab.
 
-> ⚠️ **Aucun contrôleur Ingress ni Gateway n'est installé** (comme souvent au CKA) : pour ces deux
-> couches, le grader **note l'objet Kubernetes** (déclaration correcte : classe, hôtes, chemins,
-> backends, en-têtes, poids…), pas le trafic réel. Pour les **Services**, la connectivité est
-> **testée en direct** (un Pod `probe` se connecte aux ClusterIP).
+> ⚠️ **No Ingress or Gateway controller is installed** (as is often the case in the CKA): for these two
+> layers, the grader **grades the Kubernetes object** (correct declaration: class, hosts, paths,
+> backends, headers, weights…), not real traffic. For the **Services**, connectivity is
+> **tested live** (a `probe` Pod connects to the ClusterIPs).
 
-## Mise en place
+## Getting started
 ```bash
-vagrant ssh cp1 -c "bash /vagrant/labs/lab-services-ingress-gateway/setup.sh"   # sème l'état de départ
-# … tu résous les tâches …
-vagrant ssh cp1 -c "bash /vagrant/labs/lab-services-ingress-gateway/grade.sh"   # correction (lecture seule)
+vagrant ssh cp1 -c "bash /vagrant/labs/lab-services-ingress-gateway/setup.sh"   # seed the starting state
+# … solve the tasks …
+vagrant ssh cp1 -c "bash /vagrant/labs/lab-services-ingress-gateway/grade.sh"   # grade yourself (read-only)
 ```
-> `setup.sh` est **idempotent** : il recrée les namespaces `services-lab`, `ingress-lab`, `gateway-lab`
-> et (si besoin) installe les CRD **Gateway API**. Il nettoie tes réponses précédentes avant de re-semer.
-> Les solutions sont dans [`solutions/SOLUTIONS.md`](solutions/SOLUTIONS.md) — à n'ouvrir qu'après.
+> `setup.sh` is **idempotent**: it re-creates the `services-lab`, `ingress-lab`, `gateway-lab` namespaces
+> and (if needed) installs the **Gateway API** CRDs. It cleans up your previous answers before re-seeding.
+> The solutions are in [`solutions/SOLUTIONS.md`](solutions/SOLUTIONS.md) — open it only afterwards.
 
 ---
 
-## 🔌 Domaine A — Services (40 pts) · Namespace `services-lab`
+## 🔌 Domain A — Services (40 pts) · Namespace `services-lab`
 
-### A1 — Exposer un Deployment en ClusterIP (10 pts)
-Un *Deployment* `web` (2 replicas, `app=web`, conteneur sur le port **80**) tourne déjà.
-Crée un *Service* **ClusterIP** nommé `web-svc` qui l'expose sur le port **80 → 80**.
+### A1 — Expose a Deployment as ClusterIP (10 pts)
+A *Deployment* `web` (2 replicas, `app=web`, container on port **80**) is already running.
+Create a **ClusterIP** *Service* named `web-svc` that exposes it on port **80 → 80**.
 
-> 💡 `kubectl expose deployment web --name web-svc --port 80 --target-port 80` (type ClusterIP par défaut). Vérifie que les *endpoints* se peuplent : `kubectl -n services-lab get endpoints web-svc`.
-> Attendu : `web-svc` de type `ClusterIP`, port `80→80`, selector `app=web`, **2 endpoints** prêts et joignables sur `:80`.
+> 💡 `kubectl expose deployment web --name web-svc --port 80 --target-port 80` (ClusterIP type by default). Verify that the *endpoints* get populated: `kubectl -n services-lab get endpoints web-svc`.
+> Expected: `web-svc` of type `ClusterIP`, port `80→80`, selector `app=web`, **2 endpoints** ready and reachable on `:80`.
 
-### A2 — Exposer le même Deployment en NodePort (8 pts)
-Expose aussi `web` avec un second *Service* nommé `web-np` de type **NodePort**, port **80 → 80**,
-en fixant le **nodePort** à **`30080`**.
+### A2 — Expose the same Deployment as NodePort (8 pts)
+Also expose `web` with a second *Service* named `web-np` of type **NodePort**, port **80 → 80**,
+fixing the **nodePort** to **`30080`**.
 
-> 💡 `kubectl expose … --type NodePort …` attribue un nodePort aléatoire ; pour **imposer** `30080`, édite le Service (ou pars d'un YAML avec `spec.ports[0].nodePort: 30080`).
-> Attendu : `web-np` de type `NodePort`, `nodePort=30080`, port `80→80`, selector `app=web`.
+> 💡 `kubectl expose … --type NodePort …` assigns a random nodePort; to **force** `30080`, edit the Service (or start from a YAML with `spec.ports[0].nodePort: 30080`).
+> Expected: `web-np` of type `NodePort`, `nodePort=30080`, port `80→80`, selector `app=web`.
 
-### A3 — Service headless pour un ensemble de Pods (8 pts)
-Un *Deployment* `cache` (2 replicas, `app=cache`) tourne. Crée un *Service* **headless** nommé
-`cache-hl` (**sans** IP de cluster) sur le port **80**, qui sélectionne ces Pods.
+### A3 — Headless Service for a set of Pods (8 pts)
+A *Deployment* `cache` (2 replicas, `app=cache`) is running. Create a **headless** *Service* named
+`cache-hl` (**without** a cluster IP) on port **80**, selecting those Pods.
 
-> 💡 Un Service *headless* se déclare avec `spec.clusterIP: None`. Il ne fait pas d'équilibrage : le DNS renvoie **directement les IP des Pods**. Vérifie : `kubectl -n services-lab get endpoints cache-hl` (les 2 IP doivent apparaître).
-> Attendu : `cache-hl` avec `clusterIP: None`, selector `app=cache`, port `80`, **2 adresses** d'endpoints.
+> 💡 A *headless* Service is declared with `spec.clusterIP: None`. It does no load balancing: DNS returns **the Pod IPs directly**. Verify: `kubectl -n services-lab get endpoints cache-hl` (both IPs must appear).
+> Expected: `cache-hl` with `clusterIP: None`, selector `app=cache`, port `80`, **2 endpoint addresses**.
 
-### A4 — Service sans selector + Endpoints manuels (8 pts)
-Un Pod `legacy-db` (label `app=legacy-db`) écoute sur le port **5432** — imagine une base « externe »
-que tu veux joindre via un nom de Service stable. Crée :
+### A4 — Service without selector + manual Endpoints (8 pts)
+A Pod `legacy-db` (label `app=legacy-db`) listens on port **5432** — imagine an "external" database
+you want to reach through a stable Service name. Create:
 
-1. un *Service* **ClusterIP** `db-ext` **sans selector**, port **5432 → 5432** ;
-2. un objet **Endpoints** `db-ext` (même nom que le Service) qui pointe vers l'**IP du Pod `legacy-db`** sur le port **5432**.
+1. a **ClusterIP** *Service* `db-ext` **without a selector**, port **5432 → 5432**;
+2. an **Endpoints** object `db-ext` (same name as the Service) pointing to the **IP of the `legacy-db` Pod** on port **5432**.
 
-> 💡 Récupère l'IP : `kubectl -n services-lab get pod legacy-db -o wide` (colonne `IP`). Un Service sans selector **ne crée pas** d'Endpoints automatiquement → tu dois créer l'objet `Endpoints` à la main (même nom que le Service). Le nom d'`EndpointSlice` fonctionne aussi, mais l'`Endpoints` classique est le plus rapide.
-> Attendu : `db-ext` **sans** selector (port 5432), un `Endpoints db-ext` avec ≥1 adresse, et la connexion `clusterIP:5432` aboutit bien à `legacy-db`.
+> 💡 Get the IP: `kubectl -n services-lab get pod legacy-db -o wide` (`IP` column). A Service without a selector **does not create** Endpoints automatically → you must create the `Endpoints` object by hand (same name as the Service). An `EndpointSlice` name works too, but the classic `Endpoints` is the fastest.
+> Expected: `db-ext` **without** a selector (port 5432), an `Endpoints db-ext` with ≥1 address, and the connection `clusterIP:5432` does reach `legacy-db`.
 
-### A5 — Réparer un Service cassé (6 pts)
-Le *Service* `shop-svc` est censé exposer le *Deployment* `shop` (2 replicas, `app=shop`, port **80**),
-mais **aucun endpoint** n'apparaît. Diagnostique et **corrige** le Service (ne le supprime pas).
+### A5 — Fix a broken Service (6 pts)
+The *Service* `shop-svc` is meant to expose the *Deployment* `shop` (2 replicas, `app=shop`, port **80**),
+but **no endpoint** shows up. Diagnose and **fix** the Service (do not delete it).
 
-> 💡 `kubectl -n services-lab get endpoints shop-svc` renvoie vide ⇒ le Service ne « matche » aucun Pod prêt. Compare le `spec.selector` et le `targetPort` du Service avec les labels/port réels des Pods `shop` (`kubectl -n services-lab get pods --show-labels`). Corrige avec `kubectl edit svc shop-svc`.
-> Attendu : `shop-svc` a des endpoints peuplés et répond sur `:80`.
+> 💡 `kubectl -n services-lab get endpoints shop-svc` returns empty ⇒ the Service "matches" no ready Pod. Compare the Service's `spec.selector` and `targetPort` with the real labels/port of the `shop` Pods (`kubectl -n services-lab get pods --show-labels`). Fix it with `kubectl edit svc shop-svc`.
+> Expected: `shop-svc` has populated endpoints and responds on `:80`.
 
 ---
 
-## 🌐 Domaine B — Ingress (30 pts) · Namespace `ingress-lab`
+## 🌐 Domain B — Ingress (30 pts) · Namespace `ingress-lab`
 
-> Une *IngressClass* `lab-nginx` et trois *Services* backends (`web-svc`, `app-svc`, `api-svc`, tous
-> ClusterIP:80) sont déjà présents. Le grader **note les objets Ingress** (aucun contrôleur n'est installé).
+> An *IngressClass* `lab-nginx` and three backend *Services* (`web-svc`, `app-svc`, `api-svc`, all
+> ClusterIP:80) are already present. The grader **grades the Ingress objects** (no controller is installed).
 
-### B1 — Ingress simple, hôte + chemin (10 pts)
-Crée un *Ingress* nommé `site` (classe `lab-nginx`) qui route l'hôte **`web.cka.local`**,
-chemin **`/`** de type **`Prefix`**, vers le *Service* **`web-svc`** port **80**.
+### B1 — Simple Ingress, host + path (10 pts)
+Create an *Ingress* named `site` (class `lab-nginx`) that routes the host **`web.cka.local`**,
+path **`/`** of type **`Prefix`**, to the *Service* **`web-svc`** port **80**.
 
-> 💡 `spec.ingressClassName: lab-nginx`. Chaque règle porte un `host`, et chaque chemin un `pathType` (`Prefix` ici) + un `backend.service.name`/`port.number`. `kubectl create ingress` accepte la syntaxe `--rule="web.cka.local/*=web-svc:80"` (à ajuster pour le pathType).
-> Attendu : `site` — `ingressClassName=lab-nginx`, host `web.cka.local`, chemin `/` (Prefix) → `web-svc:80`.
+> 💡 `spec.ingressClassName: lab-nginx`. Each rule carries a `host`, and each path a `pathType` (`Prefix` here) + a `backend.service.name`/`port.number`. `kubectl create ingress` accepts the syntax `--rule="web.cka.local/*=web-svc:80"` (to be adjusted for the pathType).
+> Expected: `site` — `ingressClassName=lab-nginx`, host `web.cka.local`, path `/` (Prefix) → `web-svc:80`.
 
-### B2 — Ingress « fanout » multi-chemins (10 pts)
-Crée un *Ingress* nommé `apps` pour l'hôte **`apps.cka.local`** qui répartit selon le chemin :
+### B2 — "Fanout" multi-path Ingress (10 pts)
+Create an *Ingress* named `apps` for the host **`apps.cka.local`** that splits by path:
 
 - **`/app`** (Prefix) → *Service* **`app-svc`** port **80** ;
 - **`/api`** (Prefix) → *Service* **`api-svc`** port **80**.
 
-> 💡 Un seul `host`, deux entrées sous `http.paths`, chacune avec son `pathType: Prefix` et son backend. Ordre indifférent ici (chemins disjoints).
-> Attendu : `apps` — host `apps.cka.local`, `/app`→`app-svc:80` et `/api`→`api-svc:80` (Prefix).
+> 💡 A single `host`, two entries under `http.paths`, each with its `pathType: Prefix` and its backend. Order doesn't matter here (disjoint paths).
+> Expected: `apps` — host `apps.cka.local`, `/app`→`app-svc:80` and `/api`→`api-svc:80` (Prefix).
 
-### B3 — Ingress avec TLS (10 pts)
-Sécurise un hôte en TLS :
+### B3 — Ingress with TLS (10 pts)
+Secure a host with TLS:
 
-1. Crée un *Secret* TLS nommé **`secure-tls`** (type `kubernetes.io/tls`) — un certificat auto-signé pour **`secure.cka.local`** suffit.
-2. Crée un *Ingress* nommé `secure` pour l'hôte **`secure.cka.local`**, avec un bloc **`tls`** référençant `secure-tls`, et une règle chemin **`/`** → *Service* **`web-svc`** port **80**.
+1. Create a TLS *Secret* named **`secure-tls`** (type `kubernetes.io/tls`) — a self-signed certificate for **`secure.cka.local`** is enough.
+2. Create an *Ingress* named `secure` for the host **`secure.cka.local`**, with a **`tls`** block referencing `secure-tls`, and a rule path **`/`** → *Service* **`web-svc`** port **80**.
 
-> 💡 Génère la paire avec `openssl req -x509 -newkey rsa:2048 -nodes -keyout tls.key -out tls.crt -days 365 -subj "/CN=secure.cka.local"`, puis `kubectl -n ingress-lab create secret tls secure-tls --cert=tls.crt --key=tls.key`. Dans l'Ingress, `spec.tls: [{ hosts: [secure.cka.local], secretName: secure-tls }]`.
-> Attendu : Secret `secure-tls` (type TLS) ; Ingress `secure` avec `tls.secretName=secure-tls`, `tls.hosts[0]=secure.cka.local`, règle host `secure.cka.local` `/`→`web-svc:80`.
-
----
-
-## 🚪 Domaine C — Gateway API (30 pts) · Namespace `gateway-lab`
-
-> Un *GatewayClass* `lab-gwc` et un *Gateway* `edge` (listener HTTP:80) sont déjà déployés, ainsi que les
-> *Services* backends (`web-svc`, `api-svc`, `gold-svc`, `std-svc`, `canary-v1`, `canary-v2`, tous ClusterIP:80).
-> Tu crées uniquement les **HTTPRoute** (`gateway.networking.k8s.io/v1`). Le grader note les objets.
-
-### C1 — HTTPRoute : routage par préfixe (10 pts)
-Crée une *HTTPRoute* nommée `main-route`, rattachée au *Gateway* **`edge`**, qui route :
-
-- le préfixe **`/web`** → *Service* **`web-svc`** port **80** ;
-- le préfixe **`/api`** → *Service* **`api-svc`** port **80**.
-
-> 💡 `spec.parentRefs: [{ name: edge }]`. Chaque règle : `matches[].path` (`type: PathPrefix`, `value: /web`) et `backendRefs[]` (`name`, `port`). Une règle par chemin.
-> Attendu : `main-route` référence `edge` ; `/web`→`web-svc:80` et `/api`→`api-svc:80`.
-
-### C2 — HTTPRoute : match sur en-tête + catch-all (10 pts)
-Crée une *HTTPRoute* nommée `tier-route`, rattachée à **`edge`**, pour le préfixe **`/shop`** :
-
-- si la requête porte l'en-tête **`X-Tier: gold`** → *Service* **`gold-svc`** port **80** (chemin **ET** en-tête dans le **même** *match*) ;
-- **sinon** (`/shop` seul, sans en-tête) → *Service* **`std-svc`** port **80**.
-
-> 💡 Un `match` qui liste à la fois `path` **et** `headers` applique un **ET logique**. Mets la règle `/shop` + en-tête **avant** le catch-all `/shop` : **l'ordre des règles compte** (la première qui matche gagne). Sépare-les en **deux règles** distinctes (chacune son `backendRefs`).
-> Attendu : `tier-route` — `/shop` + `X-Tier: gold` (même match) → `gold-svc` ; `/shop` seul → `std-svc`.
-
-### C3 — HTTPRoute : répartition pondérée (canary) (10 pts)
-Crée une *HTTPRoute* nommée `canary-route`, rattachée à **`edge`**, qui envoie le trafic du chemin **`/`**
-vers **deux** backends avec des **poids** :
-
-- **`canary-v1`** port **80**, poids **90** ;
-- **`canary-v2`** port **80**, poids **10**.
-
-> 💡 Une seule règle avec **deux** entrées dans `backendRefs`, chacune avec son champ `weight`. La répartition est proportionnelle à la somme des poids (ici 90/100 et 10/100).
-> Attendu : `canary-route` (rattachée à `edge`) avec `canary-v1` weight **90** et `canary-v2` weight **10** dans la même règle.
+> 💡 Generate the pair with `openssl req -x509 -newkey rsa:2048 -nodes -keyout tls.key -out tls.crt -days 365 -subj "/CN=secure.cka.local"`, then `kubectl -n ingress-lab create secret tls secure-tls --cert=tls.crt --key=tls.key`. In the Ingress, `spec.tls: [{ hosts: [secure.cka.local], secretName: secure-tls }]`.
+> Expected: Secret `secure-tls` (TLS type); Ingress `secure` with `tls.secretName=secure-tls`, `tls.hosts[0]=secure.cka.local`, rule host `secure.cka.local` `/`→`web-svc:80`.
 
 ---
 
-_Ce lab est extensible : dis « ajoute une tâche sur `<sujet>` » (ex. `ExternalName`, `sessionAffinity`, `ReferenceGrant` cross-namespace, `Gateway` multi-listener…)._
+## 🚪 Domain C — Gateway API (30 pts) · Namespace `gateway-lab`
+
+> A *GatewayClass* `lab-gwc` and a *Gateway* `edge` (HTTP:80 listener) are already deployed, along with the
+> backend *Services* (`web-svc`, `api-svc`, `gold-svc`, `std-svc`, `canary-v1`, `canary-v2`, all ClusterIP:80).
+> You only create the **HTTPRoute** objects (`gateway.networking.k8s.io/v1`). The grader grades the objects.
+
+### C1 — HTTPRoute: prefix routing (10 pts)
+Create an *HTTPRoute* named `main-route`, attached to the *Gateway* **`edge`**, that routes:
+
+- the prefix **`/web`** → *Service* **`web-svc`** port **80** ;
+- the prefix **`/api`** → *Service* **`api-svc`** port **80**.
+
+> 💡 `spec.parentRefs: [{ name: edge }]`. Each rule: `matches[].path` (`type: PathPrefix`, `value: /web`) and `backendRefs[]` (`name`, `port`). One rule per path.
+> Expected: `main-route` references `edge`; `/web`→`web-svc:80` and `/api`→`api-svc:80`.
+
+### C2 — HTTPRoute: header match + catch-all (10 pts)
+Create an *HTTPRoute* named `tier-route`, attached to **`edge`**, for the prefix **`/shop`**:
+
+- if the request carries the header **`X-Tier: gold`** → *Service* **`gold-svc`** port **80** (path **AND** header in the **same** *match*) ;
+- **otherwise** (`/shop` alone, without the header) → *Service* **`std-svc`** port **80**.
+
+> 💡 A `match` that lists both `path` **and** `headers` applies a **logical AND**. Put the `/shop` + header rule **before** the `/shop` catch-all: **rule order matters** (the first match wins). Split them into **two** separate rules (each with its `backendRefs`).
+> Expected: `tier-route` — `/shop` + `X-Tier: gold` (same match) → `gold-svc` ; `/shop` alone → `std-svc`.
+
+### C3 — HTTPRoute: weighted split (canary) (10 pts)
+Create an *HTTPRoute* named `canary-route`, attached to **`edge`**, that sends the traffic of path **`/`**
+to **two** backends with **weights**:
+
+- **`canary-v1`** port **80**, weight **90** ;
+- **`canary-v2`** port **80**, weight **10**.
+
+> 💡 A single rule with **two** entries in `backendRefs`, each with its `weight` field. The split is proportional to the sum of the weights (here 90/100 and 10/100).
+> Expected: `canary-route` (attached to `edge`) with `canary-v1` weight **90** and `canary-v2` weight **10** in the same rule.
+
+---
+
+_This lab is extensible: say "add a task on `<topic>`" (e.g. `ExternalName`, `sessionAffinity`, cross-namespace `ReferenceGrant`, multi-listener `Gateway`…)._

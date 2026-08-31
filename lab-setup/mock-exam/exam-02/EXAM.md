@@ -1,42 +1,42 @@
-# 🧪 CKA — Examen blanc n°2 · niveau avancé (lab kubeadm)
+# 🧪 CKA — Mock exam #2 · advanced level (kubeadm lab)
 
-> **Format réel CKA** : 2 h · tâches pratiques · **passage 66 %** · barème pondéré ci-dessous.
-> Environnement : le cluster du lab (`cp1` + `w1` + `w2`, K8s 1.34, Calico).
-> **Plus corsé que l'exam-01** : RBAC cluster-scoped, **upgrade kubeadm**, scheduling manuel, taints/tolerations, Secrets, **Ingress**, NetworkPolicy default-deny, `reclaimPolicy`/`subPath`, et un troubleshooting moins évident (sonde, **résolution DNS**, contrainte de placement, Secret manquant).
-> **Les solutions ne sont PAS dans ce fichier** → voir `solutions/SOLUTIONS.md` (à n'ouvrir qu'après).
+> **Real CKA format**: 2 h · hands-on tasks · **pass mark 66%** · weighted scoring below.
+> Environment: the lab cluster (`cp1` + `w1` + `w2`, K8s 1.34, Calico).
+> **Harder than exam-01**: cluster-scoped RBAC, **kubeadm upgrade**, manual scheduling, taints/tolerations, Secrets, **Ingress**, default-deny NetworkPolicy, `reclaimPolicy`/`subPath`, and less obvious troubleshooting (probe, **DNS resolution**, placement constraint, missing Secret).
+> **The solutions are NOT in this file** → see `solutions/SOLUTIONS.md` (open it only afterwards).
 
 ---
 
-## ⚙️ Mise en place (avant de démarrer le chrono)
+## ⚙️ Getting started (before starting the clock)
 
 ```bash
-# Depuis la machine hôte, dans lab-setup/
+# From the host machine, in lab-setup/
 
-# 0. ⚠️ IMPORTANT — cet examen contient une tâche d'UPGRADE IRRÉVERSIBLE (T2,
-#    à réaliser en DERNIER) qui fait passer le cluster de 1.34 à 1.35.
-#    setup.sh NE PEUT PAS redescendre le cluster : pars d'un cluster
-#    FRAÎCHEMENT déployé en 1.34 avant de commencer cet examen.
-vagrant destroy -f && vagrant up --no-parallel   # repartir propre (cluster 1.34)
-vagrant ssh cp1 -c "kubectl get nodes"           # valider : cp1/w1/w2 Ready (v1.34.x)
+# 0. ⚠️ IMPORTANT — this exam contains an IRREVERSIBLE UPGRADE task (T2,
+#    to be done LAST) which upgrades the cluster from 1.34 to 1.35.
+#    setup.sh CANNOT downgrade the cluster: start from a FRESHLY deployed
+#    1.34 cluster before you begin this exam.
+vagrant destroy -f && vagrant up --no-parallel   # start clean (cluster 1.34)
+vagrant ssh cp1 -c "kubectl get nodes"           # verify: cp1/w1/w2 Ready (v1.34.x)
 
-# 1. Amorcer l'examen n°2 (namespaces + ressources cassées)
+# 1. Seed exam #2 (namespaces + broken resources)
 vagrant ssh cp1 -c "bash /vagrant/mock-exam/exam-02/setup.sh"
 
-# 2. Se connecter au control plane pour composer
+# 2. Connect to the control plane to work
 vagrant ssh cp1
 ```
 
-Toutes les commandes se font depuis `cp1` (kubeconfig admin déjà en place), **sauf T3** (static pod, sur `w1`).
-Alias utiles déjà chargés : `k`, `$do` (`--dry-run=client -o yaml`), `$now`.
+All commands run from `cp1` (admin kubeconfig already in place), **except T3** (static pod, on `w1`).
+Handy aliases already loaded: `k`, `$do` (`--dry-run=client -o yaml`), `$now`.
 
-## 📏 Règles
+## 📏 Rules
 
-- **Un seul cluster** ici (pas de `use-context` à faire), mais **lis bien le namespace** imposé par chaque tâche.
-- Tu peux utiliser la doc officielle `kubernetes.io/docs` (comme à l'exam).
-- Le barème est **automatique** : chaque tâche est vérifiée par `grade.sh`. Respecte **noms, namespaces, labels, ports** à la lettre.
-- **Total : 100 points** répartis selon les poids réels du curriculum. Objectif : **≥ 66**.
+- **A single cluster** here (no `use-context` to run), but **read carefully the namespace** required by each task.
+- You may use the official docs `kubernetes.io/docs` (as in the exam).
+- Grading is **automatic**: each task is checked by `grade.sh`. Match **names, namespaces, labels, ports** exactly.
+- **Total: 100 points** split by the real curriculum weights. Target: **≥ 66**.
 
-| Domaine | Poids | Tâches |
+| Domain | Weight | Tasks |
 |---|---|---|
 | Cluster Architecture | 25 | T1–T4 |
 | Workloads & Scheduling | 15 | T5–T7 |
@@ -44,126 +44,126 @@ Alias utiles déjà chargés : `k`, `$do` (`--dry-run=client -o yaml`), `$now`.
 | Storage | 10 | T11–T12 |
 | Troubleshooting | 30 | T13–T16 |
 
-> 🏷️ **RÈGLE D'OR — le namespace compte pour des points.** Chaque tâche impose un namespace précis (badge `🏷️ ns` dans son titre). Une ressource correcte mais **créée dans le mauvais namespace = 0 point** (le vrai CKA vérifie le namespace à la lettre). Réflexe : mets **`-n <namespace>`** sur *chaque* commande, et vérifie avec `kubectl -n <namespace> get …` avant de passer à la suite. Les tâches **T2, T3** agissent au niveau **node/cluster** (pas de namespace).
+> 🏷️ **GOLDEN RULE — the namespace is worth points.** Each task requires a specific namespace (badge `🏷️ ns` in its title). A correct resource but **created in the wrong namespace = 0 points** (the real CKA checks the namespace exactly). Reflex: put **`-n <namespace>`** on *every* command, and verify with `kubectl -n <namespace> get …` before moving on. Tasks **T2, T3** act at the **node/cluster** level (no namespace).
 
 ---
 
 ## 🏛️ Cluster Architecture (25 pts)
 
-### T1 — RBAC cluster-scoped (7 pts) · 🏷️ **ns `platform`**
-1. Crée un **ServiceAccount** `ci-bot` dans le namespace `platform`.
-2. Crée un **ClusterRole** `deploy-admin` autorisant `get`, `list`, `watch`, `create`, `update`, `patch` sur les **deployments** (`apps`).
-3. Lie-les avec un **ClusterRoleBinding** `ci-bot-deploy` (portée cluster).
+### T1 — Cluster-scoped RBAC (7 pts) · 🏷️ **ns `platform`**
+1. Create a **ServiceAccount** `ci-bot` in the `platform` namespace.
+2. Create a **ClusterRole** `deploy-admin` allowing `get`, `list`, `watch`, `create`, `update`, `patch` on **deployments** (`apps`).
+3. Bind them with a **ClusterRoleBinding** `ci-bot-deploy` (cluster scope).
 
-> Attendu : `ci-bot` peut **créer un Deployment dans n'importe quel namespace** mais **ne peut pas** supprimer de node.
+> Expected: `ci-bot` can **create a Deployment in any namespace** but **cannot** delete a node.
 
-### T2 — Upgrade du control plane 1.34 → 1.35 (8 pts) · sur `cp1` · ⚠️ **À FAIRE EN DERNIER (IRRÉVERSIBLE)**
-Fais passer le **node control plane `cp1`** de Kubernetes **1.34** à **1.35** avec `kubeadm` : bascule le dépôt apt sur `v1.35`, `kubeadm upgrade plan` puis `kubeadm upgrade apply`, et mets à jour **`kubelet` + `kubectl`** (drain/uncordon de `cp1`, redémarrage du kubelet).
+### T2 — Control plane upgrade 1.34 → 1.35 (8 pts) · on `cp1` · ⚠️ **DO THIS LAST (IRREVERSIBLE)**
+Upgrade the **control plane node `cp1`** from Kubernetes **1.34** to **1.35** with `kubeadm`: switch the apt repo to `v1.35`, `kubeadm upgrade plan` then `kubeadm upgrade apply`, and update **`kubelet` + `kubectl`** (drain/uncordon `cp1`, restart the kubelet).
 
-> ⚠️ **`cp1` UNIQUEMENT — n'upgrade PAS les workers.** Seul `cp1` est noté. Drainer `w1`/`w2` évince **définitivement** les pods « nus » des autres tâches (T4 `pinned`, T6 `secret-pod`, T7 `tolerant`, T12 `app`, T14 `dns-check`, T15 `stuck`, plus les seeds de `secure`) : sans contrôleur, ils ne sont **pas recréés** et tu perds ces points.
-> ⚠️ **Opération irréversible** : réalise-la **en toute dernière position**, une fois toutes les autres tâches terminées. Pour rejouer l'examen, il faudra redéployer le cluster (`vagrant destroy && vagrant up`).
-> Attendu : `kubectl get node cp1` affiche une version **`v1.35.x`**.
+> ⚠️ **`cp1` ONLY — do NOT upgrade the workers.** Only `cp1` is graded. Draining `w1`/`w2` **permanently** evicts the "naked" pods from the other tasks (T4 `pinned`, T6 `secret-pod`, T7 `tolerant`, T12 `app`, T14 `dns-check`, T15 `stuck`, plus the `secure` seeds): with no controller, they are **not recreated** and you lose those points.
+> ⚠️ **Irreversible operation**: do it **very last**, once all the other tasks are done. To retake the exam, you will have to redeploy the cluster (`vagrant destroy && vagrant up`).
+> Expected: `kubectl get node cp1` shows a **`v1.35.x`** version.
 
-### T3 — Static Pod avec label (5 pts) · sur `w1`
-Sur le node **`w1`**, crée un **static pod** nommé `static-web` (image `nginx:1.29-alpine`, `containerPort` 80) via le répertoire des manifests statiques du kubelet. Le pod doit porter le **label `role=cache`**.
+### T3 — Static Pod with label (5 pts) · on `w1`
+On node **`w1`**, create a **static pod** named `static-web` (image `nginx:1.29-alpine`, `containerPort` 80) via the kubelet's static-manifests directory. The pod must carry the **label `role=cache`**.
 
-> Attendu : un pod **`static-web-w1`** `Running` (namespace `default`) sur `w1`, avec le label `role=cache`.
+> Expected: a **`static-web-w1`** pod `Running` (namespace `default`) on `w1`, with the label `role=cache`.
 
-### T4 — Scheduling manuel (5 pts) · 🏷️ **ns `apps`**
-Sans passer par le scheduler, place un Pod **`pinned`** (image `nginx:1.29-alpine`) **directement sur le node `w2`**.
+### T4 — Manual scheduling (5 pts) · 🏷️ **ns `apps`**
+Without going through the scheduler, place a Pod **`pinned`** (image `nginx:1.29-alpine`) **directly on node `w2`**.
 
-> Attendu : `pinned` `Running`, `spec.nodeName = w2`.
+> Expected: `pinned` `Running`, `spec.nodeName = w2`.
 
 ---
 
 ## 📦 Workloads & Scheduling (15 pts)
 
-### T5 — Deployment + stratégie de rollout (5 pts) · 🏷️ **ns `apps`**
-Crée un Deployment **`api`** : image **`nginx:1.29-alpine`**, **3 réplicas**, `containerPort` 80, `requests` `cpu=50m`/`memory=32Mi`, et une stratégie **RollingUpdate** avec **`maxUnavailable: 0`** (et `maxSurge: 1`).
+### T5 — Deployment + rollout strategy (5 pts) · 🏷️ **ns `apps`**
+Create a Deployment **`api`**: image **`nginx:1.29-alpine`**, **3 replicas**, `containerPort` 80, `requests` `cpu=50m`/`memory=32Mi`, and a **RollingUpdate** strategy with **`maxUnavailable: 0`** (and `maxSurge: 1`).
 
-> Attendu : 3 pods `Ready`, image correcte, `maxUnavailable = 0`.
+> Expected: 3 `Ready` pods, correct image, `maxUnavailable = 0`.
 
-### T6 — Secret → variable d'env (5 pts) · 🏷️ **ns `apps`**
-1. Crée un **Secret** `app-secret` avec la clé **`TOKEN=s3cr3t`**.
-2. Crée un **Pod** `secret-pod` (image `busybox:1.36`, commande `sleep 100000`) qui expose la variable d'environnement **`TOKEN`** à partir de ce Secret.
+### T6 — Secret → env variable (5 pts) · 🏷️ **ns `apps`**
+1. Create a **Secret** `app-secret` with the key **`TOKEN=s3cr3t`**.
+2. Create a **Pod** `secret-pod` (image `busybox:1.36`, command `sleep 100000`) that exposes the environment variable **`TOKEN`** from this Secret.
 
-> Attendu : `secret-pod` `Running`, variable `TOKEN` injectée depuis le Secret `app-secret`.
+> Expected: `secret-pod` `Running`, `TOKEN` variable injected from the Secret `app-secret`.
 
 ### T7 — Taint + toleration (5 pts) · 🏷️ **ns `apps`**
-1. Ajoute au node **`w1`** le taint **`dedicated=cka:NoSchedule`**.
-2. Crée un Pod **`tolerant`** (image `nginx:1.29-alpine`) qui **tolère** ce taint **et** se planifie **sur `w1`**.
+1. Add to node **`w1`** the taint **`dedicated=cka:NoSchedule`**.
+2. Create a Pod **`tolerant`** (image `nginx:1.29-alpine`) that **tolerates** this taint **and** schedules **on `w1`**.
 
-> Attendu : `w1` porte le taint `dedicated=cka:NoSchedule` ; `tolerant` `Running` **sur `w1`** avec la toleration correspondante.
+> Expected: `w1` carries the taint `dedicated=cka:NoSchedule`; `tolerant` `Running` **on `w1`** with the matching toleration.
 
 ---
 
 ## 🌐 Services & Networking (20 pts)
 
 ### T8 — Ingress (5 pts) · 🏷️ **ns `apps`**
-Crée un **Ingress** nommé **`api-ing`** qui route l'hôte **`api.cka.local`**, chemin **`/`** (`pathType: Prefix`), vers le Service **`api-np`** (défini en T9) sur le port **80**.
+Create an **Ingress** named **`api-ing`** that routes host **`api.cka.local`**, path **`/`** (`pathType: Prefix`), to the Service **`api-np`** (defined in T9) on port **80**.
 
-> Attendu : Ingress `api-ing` avec une règle host `api.cka.local` → service `api-np:80`, path `/` (Prefix).
-> ℹ️ Le lab n'a pas de contrôleur Ingress installé : seule la **définition** de la ressource est notée (pas le routage HTTP réel).
+> Expected: Ingress `api-ing` with a host rule `api.cka.local` → service `api-np:80`, path `/` (Prefix).
+> ℹ️ The lab has no Ingress controller installed: only the resource **definition** is graded (not real HTTP routing).
 
 ### T9 — Service NodePort (5 pts) · 🏷️ **ns `apps`**
-Crée un Service **NodePort** nommé **`api-np`** pour le Deployment `api`, port **80**, **nodePort `30090`**. (Ce Service sert aussi de **backend à l'Ingress de T8**.)
+Create a **NodePort** Service named **`api-np`** for the Deployment `api`, port **80**, **nodePort `30090`**. (This Service also serves as the **backend for the T8 Ingress**.)
 
-> Attendu : `api-np` type NodePort, nodePort `30090`, endpoints présents.
+> Expected: `api-np` of type NodePort, nodePort `30090`, endpoints present.
 
 ### T10 — NetworkPolicy default-deny + allow (10 pts) · 🏷️ **ns `secure`**
-Le namespace `secure` contient déjà `db` (label `app=db`, écoute `:80`, Service `db`), `web` (`app=web`) et `scanner` (`app=other`). Au départ, tout le monde peut joindre `db`.
-1. Crée une **NetworkPolicy** **`default-deny-ingress`** qui **bloque tout l'ingress** du namespace (podSelector vide, `policyTypes: [Ingress]`).
-2. Crée une **NetworkPolicy** **`allow-web-to-db`** qui autorise l'ingress vers `app=db`, **uniquement** depuis `app=web`, sur le **port 80**.
+The `secure` namespace already contains `db` (label `app=db`, listens on `:80`, Service `db`), `web` (`app=web`) and `scanner` (`app=other`). Initially, everyone can reach `db`.
+1. Create a **NetworkPolicy** **`default-deny-ingress`** that **blocks all ingress** in the namespace (empty podSelector, `policyTypes: [Ingress]`).
+2. Create a **NetworkPolicy** **`allow-web-to-db`** that allows ingress to `app=db`, **only** from `app=web`, on **port 80**.
 
-> Attendu : `web` peut joindre `db:80`, **`scanner` ne peut plus**.
+> Expected: `web` can reach `db:80`, **`scanner` can no longer**.
 
 ---
 
 ## 💾 Storage (10 pts)
 
 ### T11 — PV (Retain) + PVC (6 pts) · 🏷️ **ns `storage`**
-1. Crée un **PersistentVolume** `pv-fast` : `2Gi`, `hostPath` `/mnt/data-02` (**`type: DirectoryOrCreate`**, pour que le répertoire soit créé sur le node), `accessModes: ReadWriteOnce`, `storageClassName: fast`, **`persistentVolumeReclaimPolicy: Retain`**.
-2. Crée un **PVC** `data` dans `storage` : `1Gi`, `ReadWriteOnce`, `storageClassName: fast`.
+1. Create a **PersistentVolume** `pv-fast`: `2Gi`, `hostPath` `/mnt/data-02` (**`type: DirectoryOrCreate`**, so the directory is created on the node), `accessModes: ReadWriteOnce`, `storageClassName: fast`, **`persistentVolumeReclaimPolicy: Retain`**.
+2. Create a **PVC** `data` in `storage`: `1Gi`, `ReadWriteOnce`, `storageClassName: fast`.
 
-> Attendu : `data` est **`Bound`** à `pv-fast`, dont la politique de récupération est **`Retain`**.
+> Expected: `data` is **`Bound`** to `pv-fast`, whose reclaim policy is **`Retain`**.
 
-### T12 — Pod monté via subPath (4 pts) · 🏷️ **ns `storage`**
-Crée un Pod **`app`** (image `nginx:1.29-alpine`) qui monte le PVC `data` sur **`/usr/share/nginx/html`** en utilisant **`subPath: html`**.
+### T12 — Pod mounted via subPath (4 pts) · 🏷️ **ns `storage`**
+Create a Pod **`app`** (image `nginx:1.29-alpine`) that mounts the PVC `data` at **`/usr/share/nginx/html`** using **`subPath: html`**.
 
-> Attendu : `app` `Running`, volume `data` monté au bon chemin avec `subPath: html`.
+> Expected: `app` `Running`, volume `data` mounted at the right path with `subPath: html`.
 
 ---
 
 ## 🔧 Troubleshooting (30 pts)
 
-> Ces ressources sont **déjà déployées et cassées** par `setup.sh`. **Répare-les.**
+> These resources are **already deployed and broken** by `setup.sh`. **Fix them.**
 
-### T13 — Deployment jamais `Ready` (6 pts) · 🏷️ **ns `trouble`**
-Le Deployment **`frontend`** tourne mais reste `0` disponible : sa **readinessProbe** interroge le mauvais port. Corrige-la.
+### T13 — Deployment never `Ready` (6 pts) · 🏷️ **ns `trouble`**
+The Deployment **`frontend`** is running but stays `0` available: its **readinessProbe** queries the wrong port. Fix it.
 
-> Attendu : `frontend` disponible (pods `Ready`).
+> Expected: `frontend` available (pods `Ready`).
 
-### T14 — Résolution DNS cassée (8 pts) · 🏷️ **ns `trouble`**
-Le Pod **`dns-check`** tourne mais **ne résout plus aucun nom** : sa configuration DNS pointe vers un serveur injoignable. Corrige-la pour qu'il résolve les noms de services du cluster (ex. `kubernetes.default`).
+### T14 — Broken DNS resolution (8 pts) · 🏷️ **ns `trouble`**
+The Pod **`dns-check`** is running but **no longer resolves any name**: its DNS configuration points to an unreachable server. Fix it so it resolves the cluster service names (e.g. `kubernetes.default`).
 
-> Attendu : `dns-check` `Running` **et** capable de résoudre `kubernetes.default.svc.cluster.local` (via CoreDNS).
+> Expected: `dns-check` `Running` **and** able to resolve `kubernetes.default.svc.cluster.local` (via CoreDNS).
 
 ### T15 — Pod `Pending` (8 pts) · 🏷️ **ns `trouble`**
-Le Pod **`stuck`** reste `Pending` : il exige une contrainte de placement qu'aucun node ne satisfait. Fais en sorte qu'il tourne (le pod doit toujours s'appeler `stuck`, image `nginx:1.29-alpine`).
+The Pod **`stuck`** stays `Pending`: it requires a placement constraint that no node satisfies. Make it run (the pod must still be named `stuck`, image `nginx:1.29-alpine`).
 
-> Attendu : un pod `stuck` `Running` dans `trouble`.
+> Expected: a `stuck` pod `Running` in `trouble`.
 
-### T16 — Deployment bloqué en création (8 pts) · 🏷️ **ns `trouble`**
-Le Deployment **`billing`** est bloqué : il référence une variable d'env issue d'un **Secret `billing-secret`** qui n'existe pas. Crée ce Secret avec la clé **`API_KEY`** (valeur au choix) pour débloquer les pods.
+### T16 — Deployment stuck on creation (8 pts) · 🏷️ **ns `trouble`**
+The Deployment **`billing`** is stuck: it references an env variable from a **Secret `billing-secret`** that does not exist. Create this Secret with the key **`API_KEY`** (any value) to unblock the pods.
 
-> Attendu : Secret `billing-secret` (clé `API_KEY`) présent **et** pods `billing` `Running`.
+> Expected: Secret `billing-secret` (key `API_KEY`) present **and** `billing` pods `Running`.
 
 ---
 
-## ✅ Correction
+## ✅ Grading
 
 ```bash
 bash /vagrant/mock-exam/exam-02/grade.sh
 ```
 
-Le script affiche le détail par tâche (avec le **symptôme observé** en cas d'échec, jamais la solution), le score par domaine, et le **total /100** avec verdict (**≥ 66 = réussi**).
+The script prints the per-task detail (with the **observed symptom** on failure, never the solution), the score per domain, and the **total /100** with a verdict (**≥ 66 = passed**).

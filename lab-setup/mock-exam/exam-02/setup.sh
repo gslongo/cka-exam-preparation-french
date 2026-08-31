@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# setup.sh — prépare l'examen blanc CKA n°2 (niveau avancé) sur le cluster du lab.
-# À lancer SUR cp1 :  vagrant ssh cp1 -c "bash /vagrant/mock-exam/exam-02/setup.sh"
+# setup.sh — prepares CKA mock exam #2 (advanced level) on the lab cluster.
+# Run ON cp1:  vagrant ssh cp1 -c "bash /vagrant/mock-exam/exam-02/setup.sh"
 #
-# Idempotent : nettoie d'abord l'état précédent (réponses + seeds), puis re-sème
-# les ressources « cassées » nécessaires aux exercices de troubleshooting.
-# NE contient AUCUNE solution : seulement l'état de départ.
-# Aucun « vagrant destroy » nécessaire : tout se joue au niveau des objets K8s.
+# Idempotent: first cleans up the previous state (answers + seeds), then re-seeds
+# the "broken" resources needed for the troubleshooting exercises.
+# Contains NO solution: only the starting state.
+# No "vagrant destroy" needed: everything happens at the K8s object level.
 set -uo pipefail
 
-GOOD_IMG="nginx:1.29-alpine"     # image valide
+GOOD_IMG="nginx:1.29-alpine"     # valid image
 BUSYBOX="busybox:1.36"
 
-echo "🧹 Nettoyage de l'état précédent (idempotent)…"
+echo "🧹 Cleaning up previous state (idempotent)…"
 kubectl delete ns platform apps secure storage trouble --ignore-not-found --wait=false >/dev/null 2>&1
 kubectl delete clusterrole deploy-admin --ignore-not-found >/dev/null 2>&1
 kubectl delete clusterrolebinding ci-bot-deploy --ignore-not-found >/dev/null 2>&1
@@ -21,33 +21,33 @@ kubectl label node w1 disktype- >/dev/null 2>&1 || true
 kubectl label node w2 disktype- >/dev/null 2>&1 || true
 kubectl uncordon w1 w2 >/dev/null 2>&1 || true
 
-# Attendre la vraie disparition des namespaces (finalizers) avant recréation
+# Wait for the namespaces to truly disappear (finalizers) before recreating
 for ns in platform apps secure storage trouble; do
   kubectl wait --for=delete ns/$ns --timeout=120s >/dev/null 2>&1 || true
 done
 
-# Avertir si le cluster a déjà été upgradé par une T2 précédente (irréversible)
+# Warn if the cluster was already upgraded by a previous T2 (irreversible)
 cpver=$(kubectl get node cp1 -o jsonpath='{.status.nodeInfo.kubeletVersion}' 2>/dev/null)
 case "$cpver" in
-  v1.34.*) : ;;  # état de départ attendu
-  v1.35.*) echo "⚠️ cp1 est déjà en $cpver : la T2 (upgrade) a déjà été jouée. Pour rejouer l'examen, redéploie le cluster : vagrant destroy -f && vagrant up --no-parallel" ;;
-  *) echo "ℹ️  version cp1 = ${cpver:-inconnue}" ;;
+  v1.34.*) : ;;  # expected starting state
+  v1.35.*) echo "⚠️ cp1 is already on $cpver: T2 (upgrade) has already been done. To retake the exam, redeploy the cluster: vagrant destroy -f && vagrant up --no-parallel" ;;
+  *) echo "ℹ️  cp1 version = ${cpver:-unknown}" ;;
 esac
 
-echo "🌱 Création des namespaces…"
+echo "🌱 Seeding namespaces…"
 for ns in platform apps secure storage trouble; do
-  # retry tant que l'ancien ns est encore Terminating (create échoue sinon)
+  # retry while the old ns is still Terminating (create fails otherwise)
   tries=0
   until kubectl create ns "$ns" >/dev/null 2>&1; do
-    tries=$((tries+1)); [ "$tries" -ge 60 ] && { echo "   ⚠️ ns $ns indisponible (toujours Terminating ?)"; break; }
+    tries=$((tries+1)); [ "$tries" -ge 60 ] && { echo "   ⚠️ ns $ns unavailable (still Terminating?)"; break; }
     sleep 2
   done
 done
 
 # ──────────────────────────────────────────────────────────────────────────────
-# SEED — Services & Networking : NetworkPolicy default-deny (secure)
-#   db (app=db, écoute :80) + Service db ; web (app=web) et scanner (app=other)
-#   Aucune NetworkPolicy créée → tout est permis au départ (l'exo demande de fermer)
+# SEED — Services & Networking: NetworkPolicy default-deny (secure)
+#   db (app=db, listens on :80) + Service db; web (app=web) and scanner (app=other)
+#   No NetworkPolicy created → everything is allowed initially (the task asks to lock it down)
 # ──────────────────────────────────────────────────────────────────────────────
 echo "🌱 Seed secure…"
 kubectl -n secure apply -f - >/dev/null <<EOF
@@ -85,7 +85,7 @@ EOF
 # ──────────────────────────────────────────────────────────────────────────────
 echo "🌱 Seed trouble…"
 
-# T13 — readinessProbe cassée (pods jamais Ready → 0 disponible)
+# T13 — readinessProbe broken (pods never Ready → 0 available)
 kubectl -n trouble apply -f - >/dev/null <<EOF
 apiVersion: apps/v1
 kind: Deployment
@@ -101,12 +101,12 @@ spec:
         image: ${GOOD_IMG}
         ports: [{ containerPort: 80 }]
         readinessProbe:
-          httpGet: { path: /, port: 8080 }   # BUG : nginx écoute 80, pas 8080
+          httpGet: { path: /, port: 8080 }   # BUG: nginx listens on 80, not 8080
           initialDelaySeconds: 3
           periodSeconds: 5
 EOF
 
-# T14 — Résolution DNS cassée (dnsConfig vers un serveur injoignable)
+# T14 — Broken DNS resolution (dnsConfig to an unreachable server)
 kubectl -n trouble apply -f - >/dev/null <<EOF
 apiVersion: v1
 kind: Pod
@@ -114,23 +114,23 @@ metadata: { name: dns-check, namespace: trouble, labels: { app: dns-check } }
 spec:
   dnsPolicy: None
   dnsConfig:
-    nameservers: ["192.0.2.53"]   # BUG : serveur DNS injoignable (TEST-NET RFC 5737) → aucune résolution
+    nameservers: ["192.0.2.53"]   # BUG: unreachable DNS server (TEST-NET RFC 5737) → no resolution
   containers:
   - { name: c, image: ${BUSYBOX}, command: ["sh","-c","sleep 100000"] }
 EOF
 
-# T15 — Pod Pending (contrainte de placement impossible)
+# T15 — Pod Pending (impossible placement constraint)
 kubectl -n trouble apply -f - >/dev/null <<EOF
 apiVersion: v1
 kind: Pod
 metadata: { name: stuck, namespace: trouble }
 spec:
-  nodeSelector: { disktype: nvme }   # BUG : aucun node n'a ce label
+  nodeSelector: { disktype: nvme }   # BUG : no node has this label
   containers:
   - { name: web, image: ${GOOD_IMG} }
 EOF
 
-# T16 — Deployment bloqué : Secret d'env manquant (CreateContainerConfigError)
+# T16 — Deployment stuck: missing env Secret (CreateContainerConfigError)
 kubectl -n trouble apply -f - >/dev/null <<EOF
 apiVersion: apps/v1
 kind: Deployment
@@ -147,11 +147,11 @@ spec:
         env:
         - name: API_KEY
           valueFrom:
-            secretKeyRef: { name: billing-secret, key: API_KEY }   # BUG : ce Secret n'existe pas
+            secretKeyRef: { name: billing-secret, key: API_KEY }   # BUG : this Secret does not exist
 EOF
 
 echo
-echo "✅ Environnement d'examen n°2 prêt."
-echo "   • Ouvre le sujet : lab-setup/mock-exam/exam-02/EXAM.md"
-echo "   • Chrono conseillé : 2 h."
-echo "   • Correction à la fin : bash /vagrant/mock-exam/exam-02/grade.sh"
+echo "✅ Exam #2 environment ready."
+echo "   • Open the exam: lab-setup/mock-exam/exam-02/EXAM.md"
+echo "   • Suggested timer: 2 h."
+echo "   • Grade at the end: bash /vagrant/mock-exam/exam-02/grade.sh"

@@ -1,17 +1,17 @@
-# ✅ CKA — Examen blanc n°2 (avancé) · SOLUTIONS
+# ✅ CKA — Mock exam #2 (advanced) · SOLUTIONS
 
-> **N'ouvre ce fichier qu'après ta tentative.** Chaque solution correspond exactement aux critères de `grade.sh`.
-> Toutes les commandes sont à lancer depuis `cp1` (`vagrant ssh cp1`), **sauf T3** (sur `w1`).
+> **Open this file only after your attempt.** Each solution matches exactly the criteria of `grade.sh`.
+> All commands run from `cp1` (`vagrant ssh cp1`), **except T3** (on `w1`).
 
 ---
 
 ## 🏛️ Cluster Architecture
 
-### T1 — RBAC cluster-scoped (`platform`)
+### T1 — Cluster-scoped RBAC (`platform`)
 ```bash
 kubectl -n platform create sa ci-bot
 
-# ClusterRole limité aux deployments (pas de nodes → droits volontairement bornés)
+# ClusterRole limited to deployments (no nodes → deliberately bounded rights)
 kubectl create clusterrole deploy-admin \
   --verb=get,list,watch,create,update,patch \
   --resource=deployments.apps
@@ -20,32 +20,32 @@ kubectl create clusterrolebinding ci-bot-deploy \
   --clusterrole=deploy-admin \
   --serviceaccount=platform:ci-bot
 
-# Vérif
+# Verify
 kubectl auth can-i create deployments --as=system:serviceaccount:platform:ci-bot -n default   # yes
 kubectl auth can-i delete nodes       --as=system:serviceaccount:platform:ci-bot               # no
 ```
 
-### T2 — Upgrade du control plane 1.34 → 1.35 (sur `cp1`) · ⚠️ à faire en DERNIER
-> **Irréversible** : une fois `cp1` en 1.35, `setup.sh` ne peut pas revenir en arrière → redeploy nécessaire pour rejouer l'examen.
+### T2 — Control plane upgrade 1.34 → 1.35 (on `cp1`) · ⚠️ do this LAST
+> **Irreversible**: once `cp1` is on 1.35, `setup.sh` cannot roll back → redeploy needed to retake the exam.
 ```bash
-# 1) Basculer le dépôt apt de v1.34 → v1.35 (clé + liste)
+# 1) Switch the apt repo from v1.34 → v1.35 (key + list)
 sudo curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.35/deb/Release.key \
   | sudo gpg --dearmor --yes -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 sudo sed -i 's#v1\.34/deb#v1.35/deb#' /etc/apt/sources.list.d/kubernetes.list
 sudo apt-get update
 
-# 2) Installer kubeadm 1.35 (le paquet est « hold » → unhold d'abord)
-sudo apt-cache madison kubeadm | head           # repérer le patch dispo, ex : 1.35.0-1.1
+# 2) Install kubeadm 1.35 (the package is "hold" → unhold first)
+sudo apt-cache madison kubeadm | head           # find the available patch, e.g. 1.35.0-1.1
 sudo apt-mark unhold kubeadm
-sudo apt-get install -y kubeadm='1.35.0-1.1'     # adapter au patch listé
+sudo apt-get install -y kubeadm='1.35.0-1.1'     # adjust to the listed patch
 sudo apt-mark hold kubeadm
 kubeadm version
 
-# 3) Planifier puis appliquer l'upgrade du control plane
+# 3) Plan then apply the control plane upgrade
 sudo kubeadm upgrade plan
-sudo kubeadm upgrade apply v1.35.0 -y            # adapter au patch exact
+sudo kubeadm upgrade apply v1.35.0 -y            # adjust to the exact patch
 
-# 4) Drainer cp1, upgrader kubelet + kubectl, redémarrer, uncordon
+# 4) Drain cp1, upgrade kubelet + kubectl, restart, uncordon
 kubectl drain cp1 --ignore-daemonsets
 sudo apt-mark unhold kubelet kubectl
 sudo apt-get install -y kubelet='1.35.0-1.1' kubectl='1.35.0-1.1'
@@ -54,14 +54,14 @@ sudo systemctl daemon-reload
 sudo systemctl restart kubelet
 kubectl uncordon cp1
 
-# 5) Vérif
+# 5) Verify
 kubectl get node cp1        # STATUS Ready, VERSION v1.35.x
 ```
-> ⚠️ **N'upgrade PAS les workers.** `grade.sh` ne note que `cp1`. Drainer `w1`/`w2` **évince définitivement** les pods « nus » des autres tâches (T4 `pinned`, T6 `secret-pod`, T7 `tolerant`, T12 `app`, T14 `dns-check`, T15 `stuck`, seeds de `secure`) : sans contrôleur ils **ne sont pas recréés** → tu perds ces points. Un drain de `cp1` est sans danger (il n'héberge aucun pod d'examen).
+> ⚠️ **Do NOT upgrade the workers.** `grade.sh` only grades `cp1`. Draining `w1`/`w2` **permanently evicts** the "naked" pods from the other tasks (T4 `pinned`, T6 `secret-pod`, T7 `tolerant`, T12 `app`, T14 `dns-check`, T15 `stuck`, `secure` seeds): with no controller they are **not recreated** → you lose those points. Draining `cp1` is safe (it hosts no exam pod).
 
-### T3 — Static Pod avec label `role=cache` (sur `w1`)
+### T3 — Static Pod with label `role=cache` (on `w1`)
 ```bash
-vagrant ssh w1          # depuis l'hôte
+vagrant ssh w1          # from the host
 sudo tee /etc/kubernetes/manifests/static-web.yaml >/dev/null <<'EOF'
 apiVersion: v1
 kind: Pod
@@ -75,18 +75,18 @@ spec:
     image: nginx:1.29-alpine
     ports: [{ containerPort: 80 }]
 EOF
-# Le kubelet le détecte seul → le mirror pod "static-web-w1" apparaît côté API.
+# The kubelet detects it on its own → the mirror pod "static-web-w1" appears on the API side.
 ```
-> Le static pod n'est pas soumis au scheduler : le taint de `w1` (T7) ne le gêne pas.
+> The static pod is not subject to the scheduler: the `w1` taint (T7) does not bother it.
 
-### T4 — Scheduling manuel sur `w2` (`apps`)
+### T4 — Manual scheduling on `w2` (`apps`)
 ```bash
 kubectl -n apps apply -f - <<'EOF'
 apiVersion: v1
 kind: Pod
 metadata: { name: pinned, namespace: apps }
 spec:
-  nodeName: w2        # on court-circuite le scheduler
+  nodeName: w2        # bypass the scheduler
   containers:
   - { name: web, image: nginx:1.29-alpine }
 EOF
@@ -96,7 +96,7 @@ EOF
 
 ## 📦 Workloads & Scheduling
 
-### T5 — Deployment `api` + stratégie de rollout (`apps`)
+### T5 — Deployment `api` + rollout strategy (`apps`)
 ```bash
 kubectl -n apps apply -f - <<'EOF'
 apiVersion: apps/v1
@@ -120,9 +120,9 @@ spec:
 EOF
 kubectl -n apps rollout status deploy/api
 ```
-> Les 3 réplicas se placent sur `w2` (cp1 et `w1` sont taintés).
+> The 3 replicas land on `w2` (cp1 and `w1` are tainted).
 
-### T6 — Secret → variable d'env (`apps`)
+### T6 — Secret → env variable (`apps`)
 ```bash
 kubectl -n apps create secret generic app-secret --from-literal=TOKEN=s3cr3t
 
@@ -151,7 +151,7 @@ apiVersion: v1
 kind: Pod
 metadata: { name: tolerant, namespace: apps }
 spec:
-  nodeSelector: { kubernetes.io/hostname: w1 }   # cible w1
+  nodeSelector: { kubernetes.io/hostname: w1 }   # target w1
   tolerations:
   - key: dedicated
     operator: Equal
@@ -161,7 +161,7 @@ spec:
   - { name: web, image: nginx:1.29-alpine }
 EOF
 ```
-> Sans la toleration, le pod resterait `Pending` (w1 repousse tout le reste).
+> Without the toleration, the pod would stay `Pending` (w1 repels everything else).
 
 ---
 
@@ -187,7 +187,7 @@ spec:
 EOF
 kubectl -n apps get ingress api-ing
 ```
-> Le lab n'a **pas** de contrôleur Ingress → l'Ingress n'obtiendra pas d'adresse et ne routera pas réellement ; `grade.sh` ne vérifie que la **définition** (host / path / backend `api-np:80`).
+> The lab has **no** Ingress controller → the Ingress will not get an address and will not actually route; `grade.sh` only checks the **definition** (host / path / backend `api-np:80`).
 
 ### T9 — NodePort `api-np` (`apps`)
 ```bash
@@ -218,9 +218,9 @@ spec:
     ports: [{ port: 80, protocol: TCP }]
 EOF
 
-# Vérif
+# Verify
 kubectl -n secure exec web     -- wget -T3 -qO- http://db >/dev/null && echo "web OK"
-kubectl -n secure exec scanner -- wget -T3 -qO- http://db    # doit timeout
+kubectl -n secure exec scanner -- wget -T3 -qO- http://db    # should time out
 ```
 
 ---
@@ -252,7 +252,7 @@ EOF
 kubectl -n storage get pvc data     # Bound → pv-fast
 ```
 
-### T12 — Pod monté via `subPath` (`storage`)
+### T12 — Pod mounted via `subPath` (`storage`)
 ```bash
 kubectl -n storage apply -f - <<'EOF'
 apiVersion: v1
@@ -271,51 +271,51 @@ spec:
     persistentVolumeClaim: { claimName: data }
 EOF
 ```
-> Piège : avec `subPath` sur un `hostPath`, le répertoire de base doit exister sur le node, sinon le montage échoue (`stat /mnt/data-02: no such file or directory` → pod en `CreateContainerConfigError`). D'où le `type: DirectoryOrCreate` du PV en T11, qui laisse le kubelet créer le dossier.
+> Pitfall: with `subPath` on a `hostPath`, the base directory must exist on the node, otherwise the mount fails (`stat /mnt/data-02: no such file or directory` → pod in `CreateContainerConfigError`). Hence the `type: DirectoryOrCreate` on the PV in T11, which lets the kubelet create the folder.
 
 ---
 
 ## 🔧 Troubleshooting
 
-### T13 — readinessProbe sur le mauvais port (`trouble/frontend`)
-Cause : la sonde interroge `:8080` alors que nginx écoute `:80`.
+### T13 — readinessProbe on the wrong port (`trouble/frontend`)
+Cause: the probe queries `:8080` while nginx listens on `:80`.
 ```bash
 kubectl -n trouble patch deploy frontend --type=json \
   -p='[{"op":"replace","path":"/spec/template/spec/containers/0/readinessProbe/httpGet/port","value":80}]'
 kubectl -n trouble rollout status deploy/frontend
 ```
 
-### T14 — Résolution DNS cassée (`trouble/dns-check`)
-Cause : le pod utilise `dnsPolicy: None` avec un `dnsConfig.nameservers` injoignable (`192.0.2.53`) → aucune résolution. Les champs DNS d'un pod sont **immutables** → **supprimer & recréer** avec la politique par défaut (`ClusterFirst`, qui utilise CoreDNS).
+### T14 — Broken DNS resolution (`trouble/dns-check`)
+Cause: the pod uses `dnsPolicy: None` with an unreachable `dnsConfig.nameservers` (`192.0.2.53`) → no resolution. A pod's DNS fields are **immutable** → **delete & recreate** with the default policy (`ClusterFirst`, which uses CoreDNS).
 ```bash
 kubectl -n trouble delete pod dns-check
 kubectl -n trouble run dns-check --image=busybox:1.36 --labels=app=dns-check \
   -- sh -c "sleep 100000"
-# dnsPolicy ClusterFirst par défaut → résout via CoreDNS (10.96.0.10)
+# dnsPolicy ClusterFirst by default → resolves via CoreDNS (10.96.0.10)
 kubectl -n trouble exec dns-check -- nslookup kubernetes.default.svc.cluster.local
 ```
-> ⚠️ `busybox nslookup` n'applique pas les *search domains* du `resolv.conf` : le nom court `kubernetes.default` renvoie `NXDOMAIN` même quand le DNS marche. Teste avec le **FQDN** `kubernetes.default.svc.cluster.local` (c'est ce que vérifie `grade.sh`).
+> ⚠️ `busybox nslookup` does not apply the *search domains* from `resolv.conf`: the short name `kubernetes.default` returns `NXDOMAIN` even when DNS works. Test with the **FQDN** `kubernetes.default.svc.cluster.local` (that's what `grade.sh` checks).
 
 ### T15 — Pod `Pending` (`trouble/stuck`)
-Cause : `nodeSelector disktype=nvme` qu'aucun node ne satisfait. Le `nodeSelector` d'un pod est **immutable** → **supprimer & recréer**.
+Cause: `nodeSelector disktype=nvme` that no node satisfies. A pod's `nodeSelector` is **immutable** → **delete & recreate**.
 ```bash
 kubectl -n trouble delete pod stuck
 kubectl -n trouble run stuck --image=nginx:1.29-alpine
 ```
 
-### T16 — Secret d'env manquant (`trouble/billing`)
+### T16 — Missing env Secret (`trouble/billing`)
 ```bash
 kubectl -n trouble create secret generic billing-secret --from-literal=API_KEY=abc123
-kubectl -n trouble rollout status deploy/billing     # pods démarrent
+kubectl -n trouble rollout status deploy/billing     # pods start
 ```
 
 ---
 
-## 🔁 Recommencer à zéro
+## 🔁 Start over
 ```bash
-vagrant ssh cp1 -c "bash /vagrant/mock-exam/exam-02/setup.sh"   # ré-initialise l'environnement
+vagrant ssh cp1 -c "bash /vagrant/mock-exam/exam-02/setup.sh"   # re-initialise the environment
 ```
-> `setup.sh` nettoie les namespaces d'exam, le PV, le ClusterRole/Binding, retire le taint de `w1`, les labels `disktype` et dé-cordonne les workers. **⚠️ Il ne peut PAS annuler l'upgrade de la T2** : si `cp1` est déjà en 1.35, redéploie le cluster (`vagrant destroy -f && vagrant up --no-parallel`). Le **static pod T3** sur `w1` se retire à la main :
+> `setup.sh` cleans up the exam namespaces, the PV, the ClusterRole/Binding, removes the `w1` taint, the `disktype` labels and uncordons the workers. **⚠️ It CANNOT undo the T2 upgrade**: if `cp1` is already on 1.35, redeploy the cluster (`vagrant destroy -f && vagrant up --no-parallel`). The **T3 static pod** on `w1` is removed by hand:
 > ```bash
 > vagrant ssh w1 -c "sudo rm -f /etc/kubernetes/manifests/static-web.yaml"
 > ```

@@ -1,149 +1,149 @@
-# 💾 Lab — Stockage · ConfigMap/Secrets · Sidecars
+# 💾 Lab — Storage · ConfigMap/Secrets · Sidecars
 
-> **Lab thématique** (pas un examen blanc) : il se concentre sur la **configuration et la
-> persistance des workloads** — *stockage* (PV/PVC/StorageClass), *config* (ConfigMap/Secrets)
-> et *Pods multi-conteneurs* (emptyDir partagé, sidecar natif).
-> Les tâches sont **quasi indépendantes** et de difficulté progressive : tu peux en jouer une seule à la fois.
-> **100 pts**, objectif **≥ 75 %**. Pas de limite de temps — c'est un lab d'entraînement.
+> **Themed lab** (not a mock exam): it focuses on **workload configuration and
+> persistence** — *storage* (PV/PVC/StorageClass), *config* (ConfigMap/Secrets)
+> and *multi-container Pods* (shared emptyDir, native sidecar).
+> The tasks are **nearly independent** and of increasing difficulty: you can play just one at a time.
+> **100 pts**, target **≥ 75 %**. No time limit — this is a practice lab.
 
-> ⚠️ **Aucun provisioner dynamique (CSI) n'est installé** (cluster kubeadm nu). La *StorageClass* de A1
-> est donc notée sur l'**objet** (ses champs), comme pour un Ingress sans contrôleur. En revanche, le
-> **binding statique PV↔PVC** (hostPath) et les **Pods** sont testés **en direct** : le grader lit le
-> statut réel (`Bound`, `Running`) et **exec** dans les Pods pour vérifier montages, variables d'env et
-> fichiers partagés.
+> ⚠️ **No dynamic provisioner (CSI) is installed** (bare kubeadm cluster). The *StorageClass* in A1
+> is therefore graded on the **object** (its fields), like an Ingress with no controller. However, the
+> **static PV↔PVC binding** (hostPath) and the **Pods** are tested **live**: the grader reads the
+> real status (`Bound`, `Running`) and **execs** into the Pods to verify mounts, env variables and
+> shared files.
 
-## Mise en place
+## Getting started
 ```bash
-vagrant ssh cp1 -c "bash /vagrant/labs/lab-storage-config-multicontainer/setup.sh"   # sème l'état de départ
-# … tu résous les tâches …
-vagrant ssh cp1 -c "bash /vagrant/labs/lab-storage-config-multicontainer/grade.sh"   # correction (lecture seule)
+vagrant ssh cp1 -c "bash /vagrant/labs/lab-storage-config-multicontainer/setup.sh"   # seed the starting state
+# … you solve the tasks …
+vagrant ssh cp1 -c "bash /vagrant/labs/lab-storage-config-multicontainer/grade.sh"   # grade yourself (read-only)
 ```
-> `setup.sh` est **idempotent** : il recrée les namespaces `storage-lab`, `config-lab`, `multi-lab`,
-> (re)crée les *PersistentVolumes* `pv-data` et `pv-archive`, et laisse volontairement `pv-archive`
-> en état **`Released`** (pour la tâche A4). Il nettoie tes réponses précédentes avant de re-semer.
-> Les solutions sont dans [`solutions/SOLUTIONS.md`](solutions/SOLUTIONS.md) — à n'ouvrir qu'après.
+> `setup.sh` is **idempotent**: it recreates the `storage-lab`, `config-lab`, `multi-lab` namespaces,
+> (re)creates the *PersistentVolumes* `pv-data` and `pv-archive`, and deliberately leaves `pv-archive`
+> in the **`Released`** state (for task A4). It cleans up your previous answers before re-seeding.
+> The solutions are in [`solutions/SOLUTIONS.md`](solutions/SOLUTIONS.md) — open it only afterwards.
 
 ---
 
-## 💾 Domaine A — Stockage persistant (40 pts) · Namespace `storage-lab`
+## 💾 Domain A — Persistent storage (40 pts) · Namespace `storage-lab`
 
-### A1 — Créer une StorageClass (8 pts)
-Crée une *StorageClass* nommée **`fast-local`** avec :
+### A1 — Create a StorageClass (8 pts)
+Create a *StorageClass* named **`fast-local`** with:
 
-- provisioner **`example.com/fast-provisioner`** (illustratif — aucun contrôleur derrière) ;
-- **`volumeBindingMode: WaitForFirstConsumer`** ;
-- **`reclaimPolicy: Retain`** ;
+- provisioner **`example.com/fast-provisioner`** (illustrative — no controller behind it);
+- **`volumeBindingMode: WaitForFirstConsumer`**;
+- **`reclaimPolicy: Retain`**;
 - **`allowVolumeExpansion: true`**.
 
-> 💡 Une *StorageClass* n'a **pas** de bloc `spec` : `provisioner`, `reclaimPolicy`, `volumeBindingMode`
-> et `allowVolumeExpansion` sont des champs de **premier niveau**. `WaitForFirstConsumer` retarde la
-> création du volume jusqu'à ce qu'un Pod consomme le PVC (utile pour la topologie multi-zones).
-> Attendu : `fast-local` — provisioner `example.com/fast-provisioner`, `WaitForFirstConsumer`, `Retain`, expansion **activée**.
+> 💡 A *StorageClass* has **no** `spec` block: `provisioner`, `reclaimPolicy`, `volumeBindingMode`
+> and `allowVolumeExpansion` are **top-level** fields. `WaitForFirstConsumer` delays volume
+> creation until a Pod consumes the PVC (useful for multi-zone topology).
+> Expected: `fast-local` — provisioner `example.com/fast-provisioner`, `WaitForFirstConsumer`, `Retain`, expansion **enabled**.
 
-### A2 — Lier un PVC à un PV statique (10 pts)
-Un *PersistentVolume* **`pv-data`** (hostPath, **5Gi**, `ReadWriteOnce`, `storageClassName: manual`)
-existe déjà. Crée dans `storage-lab` un *PVC* **`app-data`** qui s'y lie :
+### A2 — Bind a PVC to a static PV (10 pts)
+A *PersistentVolume* **`pv-data`** (hostPath, **5Gi**, `ReadWriteOnce`, `storageClassName: manual`)
+already exists. In `storage-lab`, create a *PVC* **`app-data`** that binds to it:
 **2Gi**, `ReadWriteOnce`, `storageClassName: manual`.
 
-> 💡 Le binding **statique** ne dépend d'aucun provisioner : le contrôleur associe le PVC à un PV
-> **compatible** (même `storageClassName`, `accessModes` inclus, capacité ≥ demande). Vérifie :
-> `kubectl -n storage-lab get pvc app-data` (colonne `STATUS` = `Bound`, `VOLUME` = `pv-data`).
-> Attendu : `app-data` est **`Bound`** et lié précisément à **`pv-data`**.
+> 💡 **Static** binding depends on no provisioner: the controller matches the PVC to a
+> **compatible** PV (same `storageClassName`, `accessModes` included, capacity ≥ request). Verify:
+> `kubectl -n storage-lab get pvc app-data` (`STATUS` column = `Bound`, `VOLUME` = `pv-data`).
+> Expected: `app-data` is **`Bound`** and bound precisely to **`pv-data`**.
 
-### A3 — Consommer le PVC dans un Pod (10 pts)
-Crée un *Pod* **`app`** (image `busybox:1.36`, qui reste vivant — ex. `sleep 100000`) qui **monte**
-le PVC `app-data` sur **`/data`**. Puis crée dans ce volume un fichier vide **`/data/ready`**.
+### A3 — Consume the PVC in a Pod (10 pts)
+Create a *Pod* **`app`** (image `busybox:1.36`, kept alive — e.g. `sleep 100000`) that **mounts**
+the `app-data` PVC on **`/data`**. Then create an empty file **`/data/ready`** in that volume.
 
-> 💡 Deux morceaux : `spec.volumes[].persistentVolumeClaim.claimName: app-data` et, dans le conteneur,
-> `volumeMounts[].mountPath: /data`. Le fichier se crée après démarrage : `kubectl -n storage-lab exec app -- touch /data/ready`.
-> Attendu : `app` `Running`, volume adossé au PVC `app-data` monté sur `/data`, et le fichier `/data/ready` présent.
+> 💡 Two pieces: `spec.volumes[].persistentVolumeClaim.claimName: app-data` and, in the container,
+> `volumeMounts[].mountPath: /data`. The file is created after startup: `kubectl -n storage-lab exec app -- touch /data/ready`.
+> Expected: `app` `Running`, volume backed by the `app-data` PVC mounted on `/data`, and the file `/data/ready` present.
 
-### A4 — Récupérer un PV bloqué en `Released` (12 pts)
-Le *PersistentVolume* **`pv-archive`** (3Gi, `storageClassName: archive`, `reclaimPolicy: Retain`)
-est coincé en **`Released`** : son ancien PVC a été supprimé mais le **`claimRef`** périmé empêche
-tout nouveau binding. Rends-le réutilisable, puis lie-lui un nouveau PVC :
+### A4 — Recover a PV stuck in `Released` (12 pts)
+The *PersistentVolume* **`pv-archive`** (3Gi, `storageClassName: archive`, `reclaimPolicy: Retain`)
+is stuck in **`Released`**: its former PVC was deleted but the stale **`claimRef`** blocks
+any new binding. Make it reusable again, then bind a new PVC to it:
 
-1. **Débloque** `pv-archive` pour qu'il repasse `Available` ;
-2. crée un *PVC* **`archive`** dans `storage-lab` (`ReadWriteOnce`, **2Gi**, `storageClassName: archive`)
-   qui se **lie** à `pv-archive`.
+1. **Unblock** `pv-archive` so it returns to `Available`.
+2. Create a *PVC* **`archive`** in `storage-lab` (`ReadWriteOnce`, **2Gi**, `storageClassName: archive`)
+   that **binds** to `pv-archive`.
 
-> 💡 `kubectl get pv pv-archive -o yaml` montre un bloc `spec.claimRef` (namespace + name + **uid** obsolète).
-> Tant qu'il est présent avec un `uid` qui ne correspond à aucun PVC, le PV reste `Released`. Retire ce
-> bloc (`kubectl edit pv pv-archive` → supprimer `claimRef`, ou `kubectl patch pv pv-archive --type=json -p '[{"op":"remove","path":"/spec/claimRef"}]'`).
-> Attendu : `pv-archive` **n'est plus `Released`** (Available puis Bound) et le PVC `archive` est **`Bound`** à `pv-archive`.
+> 💡 `kubectl get pv pv-archive -o yaml` shows a `spec.claimRef` block (namespace + name + stale **uid**).
+> As long as it is present with a `uid` that matches no PVC, the PV stays `Released`. Remove that
+> block (`kubectl edit pv pv-archive` → delete `claimRef`, or `kubectl patch pv pv-archive --type=json -p '[{"op":"remove","path":"/spec/claimRef"}]'`).
+> Expected: `pv-archive` is **no longer `Released`** (Available then Bound) and the `archive` PVC is **`Bound`** to `pv-archive`.
 
 ---
 
-## ⚙️ Domaine B — ConfigMap & Secrets (35 pts) · Namespace `config-lab`
+## ⚙️ Domain B — ConfigMap & Secrets (35 pts) · Namespace `config-lab`
 
-### B1 — ConfigMap multi-clés (8 pts)
-Crée une *ConfigMap* nommée **`app-config`** avec **trois** clés :
+### B1 — Multi-key ConfigMap (8 pts)
+Create a *ConfigMap* named **`app-config`** with **three** keys:
 
 - **`APP_MODE=production`**
 - **`LOG_LEVEL=info`**
 - **`MAX_CONNECTIONS=100`**
 
 > 💡 `kubectl -n config-lab create configmap app-config --from-literal=APP_MODE=production --from-literal=LOG_LEVEL=info --from-literal=MAX_CONNECTIONS=100`.
-> Attendu : `app-config` contient les 3 clés/valeurs exactes.
+> Expected: `app-config` contains the 3 exact keys/values.
 
-### B2 — Secret Opaque (7 pts)
-Crée un *Secret* **`db-credentials`** (type **`Opaque`**) avec :
+### B2 — Opaque Secret (7 pts)
+Create a *Secret* **`db-credentials`** (type **`Opaque`**) with:
 
 - **`username=admin`**
 - **`password=S3cr3t-pass`**
 
 > 💡 `kubectl -n config-lab create secret generic db-credentials --from-literal=username=admin --from-literal=password=S3cr3t-pass`
-> (les valeurs sont stockées **base64** — ce n'est pas du chiffrement).
-> Attendu : `db-credentials` de type `Opaque`, `username` et `password` décodant vers les bonnes valeurs.
+> (the values are stored as **base64** — this is not encryption).
+> Expected: `db-credentials` of type `Opaque`, with `username` and `password` decoding to the right values.
 
-### B3 — Injecter la config en variables d'environnement (10 pts)
-Crée un *Pod* **`api`** (image `busybox:1.36`, qui reste vivant) qui reçoit :
+### B3 — Inject the config as environment variables (10 pts)
+Create a *Pod* **`api`** (image `busybox:1.36`, kept alive) that receives:
 
-- **toutes** les clés de `app-config` comme variables d'env (**`envFrom`**) ;
-- une variable **`DB_PASSWORD`** dont la valeur vient de la clé **`password`** du Secret `db-credentials` (**`secretKeyRef`**).
+- **all** the keys of `app-config` as env variables (**`envFrom`**);
+- a **`DB_PASSWORD`** variable whose value comes from the **`password`** key of the `db-credentials` Secret (**`secretKeyRef`**).
 
-> 💡 `envFrom: [{ configMapRef: { name: app-config } }]` importe chaque clé comme variable homonyme.
-> `DB_PASSWORD` se fait avec `env: [{ name: DB_PASSWORD, valueFrom: { secretKeyRef: { name: db-credentials, key: password } } }]`.
-> Vérifie : `kubectl -n config-lab exec api -- printenv APP_MODE DB_PASSWORD`.
-> Attendu : dans `api`, `APP_MODE=production`, `MAX_CONNECTIONS=100` (via `envFrom`) et `DB_PASSWORD=S3cr3t-pass` (via `secretKeyRef`).
+> 💡 `envFrom: [{ configMapRef: { name: app-config } }]` imports each key as a variable of the same name.
+> `DB_PASSWORD` is done with `env: [{ name: DB_PASSWORD, valueFrom: { secretKeyRef: { name: db-credentials, key: password } } }]`.
+> Verify: `kubectl -n config-lab exec api -- printenv APP_MODE DB_PASSWORD`.
+> Expected: in `api`, `APP_MODE=production`, `MAX_CONNECTIONS=100` (via `envFrom`) and `DB_PASSWORD=S3cr3t-pass` (via `secretKeyRef`).
 
-### B4 — Monter une ConfigMap en volume (10 pts)
-1. Crée une *ConfigMap* **`web-index`** avec une clé **`index.html`** dont le contenu contient la chaîne **`CKA Storage Lab`**.
-2. Crée un *Pod* **`web`** (image `nginx:1.29-alpine`) qui **monte** `web-index` en **volume** sur **`/usr/share/nginx/html`** (la clé `index.html` devient donc le fichier servi).
+### B4 — Mount a ConfigMap as a volume (10 pts)
+1. Create a *ConfigMap* **`web-index`** with a key **`index.html`** whose content contains the string **`CKA Storage Lab`**.
+2. Create a *Pod* **`web`** (image `nginx:1.29-alpine`) that **mounts** `web-index` as a **volume** on **`/usr/share/nginx/html`** (the `index.html` key thus becomes the served file).
 
-> 💡 Une ConfigMap montée en volume expose **chaque clé comme un fichier** (`mountPath/<clé>`). Ici la
-> clé `index.html` remplace la page par défaut de nginx. `spec.volumes[].configMap.name: web-index` +
-> `volumeMounts[].mountPath: /usr/share/nginx/html`. Vérifie : `kubectl -n config-lab exec web -- cat /usr/share/nginx/html/index.html`.
-> Attendu : `web` `Running`, et `/usr/share/nginx/html/index.html` contient bien `CKA Storage Lab`.
-
----
-
-## 🧩 Domaine C — Sidecars & Pods multi-conteneurs (25 pts) · Namespace `multi-lab`
-
-### C1 — Deux conteneurs partageant un `emptyDir` (13 pts)
-Crée un *Pod* **`shared-logs`** avec **deux** conteneurs partageant un volume **`emptyDir`** monté sur
-**`/var/log/app`** dans les deux :
-
-- **`writer`** (`busybox:1.36`) écrit en continu dans **`/var/log/app/app.log`** (ex. la date chaque seconde) ;
-- **`sidecar`** (`busybox:1.36`) **lit** ce même fichier (ex. `tail -f /var/log/app/app.log`).
-
-> 💡 Un `emptyDir` est **partagé** entre les conteneurs d'un même Pod (durée de vie = celle du Pod).
-> Monte le **même** volume aux deux conteneurs. Writer typique : `sh -c 'while true; do date >> /var/log/app/app.log; sleep 1; done'`.
-> Attendu : `shared-logs` `Running` (2 conteneurs), `emptyDir` monté sur `/var/log/app` **des deux côtés**, et `/var/log/app/app.log` **non vide** (le sidecar voit ce qu'écrit le writer).
-
-### C2 — Sidecar « natif » (initContainer `restartPolicy: Always`) (12 pts)
-Crée un *Pod* **`web-agent`** avec :
-
-- un conteneur principal **`web`** (`nginx:1.29-alpine`) ;
-- un **sidecar natif** nommé **`log-agent`** (`busybox:1.36`, long-running — ex. `sleep 100000`),
-  déclaré comme un **`initContainer`** portant **`restartPolicy: Always`**.
-
-> 💡 Depuis K8s **1.29**, un `initContainer` avec `restartPolicy: Always` est un **sidecar natif** : il
-> démarre **avant** les conteneurs principaux **et** reste en vie tout le long (contrairement à un
-> initContainer classique qui doit se terminer). C'est le patron moderne recommandé (log shipper, proxy…).
-> Attendu : `web-agent` `Running`, avec un `initContainer` `log-agent` dont `restartPolicy=Always` **toujours actif**, et le conteneur `web` démarré.
+> 💡 A ConfigMap mounted as a volume exposes **each key as a file** (`mountPath/<key>`). Here the
+> `index.html` key replaces nginx's default page. `spec.volumes[].configMap.name: web-index` +
+> `volumeMounts[].mountPath: /usr/share/nginx/html`. Verify: `kubectl -n config-lab exec web -- cat /usr/share/nginx/html/index.html`.
+> Expected: `web` `Running`, and `/usr/share/nginx/html/index.html` indeed contains `CKA Storage Lab`.
 
 ---
 
-_Ce lab est extensible : dis « ajoute une tâche sur `<sujet>` » (ex. `projected volume`, `subPath`,
-`immutable` ConfigMap/Secret, `defaultMode`/`items`, `docker-registry` secret, resize de PVC…)._
+## 🧩 Domain C — Sidecars & multi-container Pods (25 pts) · Namespace `multi-lab`
+
+### C1 — Two containers sharing an `emptyDir` (13 pts)
+Create a *Pod* **`shared-logs`** with **two** containers sharing an **`emptyDir`** volume mounted on
+**`/var/log/app`** in both:
+
+- **`writer`** (`busybox:1.36`) writes continuously to **`/var/log/app/app.log`** (e.g. the date every second);
+- **`sidecar`** (`busybox:1.36`) **reads** that same file (e.g. `tail -f /var/log/app/app.log`).
+
+> 💡 An `emptyDir` is **shared** between the containers of the same Pod (lifetime = the Pod's).
+> Mount the **same** volume in both containers. Typical writer: `sh -c 'while true; do date >> /var/log/app/app.log; sleep 1; done'`.
+> Expected: `shared-logs` `Running` (2 containers), `emptyDir` mounted on `/var/log/app` **on both sides**, and `/var/log/app/app.log` **non-empty** (the sidecar sees what the writer writes).
+
+### C2 — "Native" sidecar (initContainer `restartPolicy: Always`) (12 pts)
+Create a *Pod* **`web-agent`** with:
+
+- a main container **`web`** (`nginx:1.29-alpine`);
+- a **native sidecar** named **`log-agent`** (`busybox:1.36`, long-running — e.g. `sleep 100000`),
+  declared as an **`initContainer`** carrying **`restartPolicy: Always`**.
+
+> 💡 Since K8s **1.29**, an `initContainer` with `restartPolicy: Always` is a **native sidecar**: it
+> starts **before** the main containers **and** stays alive the whole time (unlike a classic
+> initContainer, which must terminate). It's the recommended modern pattern (log shipper, proxy…).
+> Expected: `web-agent` `Running`, with an `initContainer` `log-agent` whose `restartPolicy=Always` is **always active**, and the `web` container started.
+
+---
+
+_This lab is extensible: say "add a task on `<topic>`" (e.g. `projected volume`, `subPath`,
+`immutable` ConfigMap/Secret, `defaultMode`/`items`, `docker-registry` secret, PVC resize…)._

@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# setup.sh — prépare le lab thématique « Services · Ingress · Gateway API ».
-# À lancer SUR cp1 :  vagrant ssh cp1 -c "bash /vagrant/labs/lab-services-ingress-gateway/setup.sh"
+# setup.sh — prepares the themed lab "Services · Ingress · Gateway API".
+# Run ON cp1:  vagrant ssh cp1 -c "bash /vagrant/labs/lab-services-ingress-gateway/setup.sh"
 #
-# Idempotent : nettoie d'abord l'état précédent (namespaces + objets cluster),
-# puis re-sème l'état de départ. NE contient AUCUNE solution.
+# Idempotent: first cleans up the previous state (namespaces + cluster objects),
+# then re-seeds the starting state. Contains NO solution.
 set -uo pipefail
 
 BASE=/opt/sig-lab
 AGN=registry.k8s.io/e2e-test-images/agnhost:2.53
 
-echo "🧹 Nettoyage de l'état précédent (idempotent)…"
+echo "🧹 Cleaning up the previous state (idempotent)…"
 kubectl delete ns services-lab ingress-lab gateway-lab --ignore-not-found >/dev/null 2>&1 || true
 kubectl delete ingressclass lab-nginx --ignore-not-found >/dev/null 2>&1 || true
 kubectl delete gatewayclass lab-gwc --ignore-not-found >/dev/null 2>&1 || true
@@ -17,9 +17,9 @@ kubectl wait --for=delete ns/services-lab ns/ingress-lab ns/gateway-lab --timeou
 sudo rm -rf "$BASE"; sudo mkdir -p "$BASE"; sudo chmod 0777 "$BASE"
 
 # ──────────────────────────────────────────────────────────────────────────────
-# CRD Gateway API (installées une seule fois si absentes — canal « standard »)
+# Gateway API CRDs (installed once if missing — "standard" channel)
 if ! kubectl get crd httproutes.gateway.networking.k8s.io >/dev/null 2>&1; then
-  echo "🌐 Installation des CRD Gateway API (standard channel)…"
+  echo "🌐 Installing the Gateway API CRDs (standard channel)…"
   GWAPI_VER=$(curl -s https://api.github.com/repos/kubernetes-sigs/gateway-api/releases/latest \
     | grep -oP '"tag_name": "\K[^"]+')
   [ -n "${GWAPI_VER:-}" ] || GWAPI_VER=v1.2.1
@@ -32,12 +32,12 @@ kubectl create ns ingress-lab  >/dev/null 2>&1
 kubectl create ns gateway-lab  >/dev/null 2>&1
 
 # ══════════════════════════════════════════════════════════════════════════════
-# DOMAINE A — Services
-#   web   (A1/A2) : Deployment 2 replicas, à exposer en ClusterIP puis NodePort.
-#   cache (A3)    : Deployment 2 replicas, à exposer en Service headless.
-#   shop  (A5)    : Deployment 2 replicas + Service CASSÉ (mauvais selector + targetPort).
-#   legacy-db (A4): Pod « externe » (agnhost) — cible d'un Service SANS selector.
-#   probe         : Pod agnhost pour les tests de connectivité du grader.
+# DOMAIN A — Services
+#   web   (A1/A2) : Deployment 2 replicas, to expose as ClusterIP then NodePort.
+#   cache (A3)    : Deployment 2 replicas, to expose as a headless Service.
+#   shop  (A5)    : Deployment 2 replicas + BROKEN Service (wrong selector + targetPort).
+#   legacy-db (A4): "external" Pod (agnhost) — target of a Service WITHOUT selector.
+#   probe         : agnhost Pod for the grader's connectivity tests.
 echo "🌱 Seed A (Services)…"
 kubectl -n services-lab apply -f - >/dev/null 2>&1 <<'EOF'
 apiVersion: apps/v1
@@ -100,7 +100,7 @@ spec:
         ports:
         - containerPort: 80
 ---
-# Service CASSÉ pour A5 : selector erroné (app=shop-frontend) ET targetPort erroné (8080).
+# BROKEN Service for A5: wrong selector (app=shop-frontend) AND wrong targetPort (8080).
 apiVersion: v1
 kind: Service
 metadata:
@@ -113,17 +113,17 @@ spec:
     targetPort: 8080
 EOF
 
-# legacy-db : écouteur TCP sur 5432 (cible des Endpoints manuels de A4)
+# legacy-db : TCP listener on 5432 (target of A4's manual Endpoints)
 kubectl -n services-lab run legacy-db --image="$AGN" --labels=app=legacy-db \
   --command -- /agnhost netexec --http-port=5432 >/dev/null 2>&1
-# probe : client agnhost (le grader y lance `/agnhost connect`)
+# probe : agnhost client (the grader runs `/agnhost connect` in it)
 kubectl -n services-lab run probe --image="$AGN" --command -- /agnhost pause >/dev/null 2>&1
 kubectl -n services-lab wait --for=condition=Ready pod --all --timeout=120s >/dev/null 2>&1 || true
 
 # ══════════════════════════════════════════════════════════════════════════════
-# DOMAINE B — Ingress
-#   IngressClass lab-nginx (aucun contrôleur installé : on note l'OBJET Ingress).
-#   echo : backends partagés ; web-svc / app-svc / api-svc pointent dessus.
+# DOMAIN B — Ingress
+#   IngressClass lab-nginx (no controller installed: we grade the Ingress OBJECT).
+#   echo : shared backends ; web-svc / app-svc / api-svc point to it.
 echo "🌱 Seed B (Ingress)…"
 kubectl -n ingress-lab apply -f - >/dev/null 2>&1 <<'EOF'
 apiVersion: networking.k8s.io/v1
@@ -188,9 +188,9 @@ spec:
 EOF
 
 # ══════════════════════════════════════════════════════════════════════════════
-# DOMAINE C — Gateway API
-#   GatewayClass lab-gwc + Gateway edge (listener HTTP:80). Aucun contrôleur :
-#   on note l'OBJET HTTPRoute. Backends echo partagés.
+# DOMAIN C — Gateway API
+#   GatewayClass lab-gwc + Gateway edge (HTTP:80 listener). No controller:
+#   we grade the HTTPRoute OBJECT. Shared echo backends.
 echo "🌱 Seed C (Gateway API)…"
 kubectl -n gateway-lab apply -f - >/dev/null 2>&1 <<'EOF'
 apiVersion: gateway.networking.k8s.io/v1
@@ -285,5 +285,5 @@ spec:
 EOF
 
 sudo chmod -R 0777 "$BASE"
-echo "✅ Setup lab Services/Ingress/Gateway terminé."
-echo "   Tâches : voir LAB.md. Correction : bash /vagrant/labs/lab-services-ingress-gateway/grade.sh"
+echo "✅ Setup of the Services/Ingress/Gateway lab complete."
+echo "   Tasks: see LAB.md. Grade: bash /vagrant/labs/lab-services-ingress-gateway/grade.sh"

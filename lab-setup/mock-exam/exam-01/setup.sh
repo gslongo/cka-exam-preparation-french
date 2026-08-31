@@ -1,49 +1,49 @@
 #!/usr/bin/env bash
-# setup.sh — prépare l'environnement de l'examen blanc CKA sur le cluster du lab.
-# À lancer SUR cp1 :  vagrant ssh cp1 -c "bash /vagrant/mock-exam/exam-01/setup.sh"
+# setup.sh — prepares the CKA mock-exam environment on the lab cluster.
+# Run ON cp1:  vagrant ssh cp1 -c "bash /vagrant/mock-exam/exam-01/setup.sh"
 #
-# Idempotent : nettoie d'abord l'état précédent (réponses + seeds), puis re-sème
-# les ressources « cassées » nécessaires aux exercices de troubleshooting.
-# NE contient AUCUNE solution : seulement l'état de départ.
+# Idempotent: first cleans up the previous state (answers + seeds), then re-seeds
+# the "broken" resources needed for the troubleshooting exercises.
+# Contains NO solution: only the starting state.
 set -uo pipefail
 
-GOOD_IMG="nginx:1.29-alpine"     # image valide
-BAD_IMG="nginx:1.29-nope"        # tag inexistant (exo image cassée)
+GOOD_IMG="nginx:1.29-alpine"     # valid image
+BAD_IMG="nginx:1.29-nope"        # nonexistent tag (broken-image exercise)
 BUSYBOX="busybox:1.36"
 
-echo "🧹 Nettoyage de l'état précédent (idempotent)…"
+echo "🧹 Cleaning up the previous state (idempotent)…"
 kubectl delete ns rbac-test workloads netpol storage trouble --ignore-not-found --wait=false >/dev/null 2>&1
 kubectl delete pv pv-manual --ignore-not-found >/dev/null 2>&1
 kubectl label node w1 disktype- >/dev/null 2>&1 || true
 kubectl uncordon w1 w2 >/dev/null 2>&1 || true
 sudo rm -f /opt/etcd-backup.db 2>/dev/null || true
 
-# Attendre la vraie disparition des namespaces (finalizers) avant recréation
+# Wait for the namespaces to really disappear (finalizers) before recreating
 for ns in rbac-test workloads netpol storage trouble; do
   kubectl wait --for=delete ns/$ns --timeout=120s >/dev/null 2>&1 || true
 done
 
-echo "📦 etcd-client (pour l'exo snapshot)…"
+echo "📦 etcd-client (for the snapshot exercise)…"
 if ! command -v etcdctl >/dev/null 2>&1; then
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -y etcd-client >/dev/null 2>&1 \
-    && echo "   etcdctl installé" || echo "   ⚠️ install etcd-client KO (réseau ?) — l'exo etcd reste faisable via le pod etcd"
+    && echo "   etcdctl installed" || echo "   ⚠️ etcd-client install failed (network?) — the etcd exercise is still doable via the etcd pod"
 fi
 
-echo "🌱 Création des namespaces…"
+echo "🌱 Creating the namespaces…"
 for ns in rbac-test workloads netpol storage trouble; do
-  # retry tant que l'ancien ns est encore Terminating (create échoue sinon)
+  # retry while the old ns is still Terminating (create fails otherwise)
   tries=0
   until kubectl create ns "$ns" >/dev/null 2>&1; do
-    tries=$((tries+1)); [ "$tries" -ge 60 ] && { echo "   ⚠️ ns $ns indisponible (toujours Terminating ?)"; break; }
+    tries=$((tries+1)); [ "$tries" -ge 60 ] && { echo "   ⚠️ ns $ns unavailable (still Terminating?)"; break; }
     sleep 2
   done
 done
 
 # ──────────────────────────────────────────────────────────────────────────────
-# SEED — Services & Networking : NetworkPolicy (netpol)
-#   backend (app=backend, écoute :80) + Service backend
-#   frontend (app=frontend) et client (app=other) = testeurs
-#   Aucune NetworkPolicy créée → tout est permis au départ (l'exo la demande)
+# SEED — Services & Networking: NetworkPolicy (netpol)
+#   backend (app=backend, listens on :80) + Service backend
+#   frontend (app=frontend) and client (app=other) = testers
+#   No NetworkPolicy created → everything is allowed at first (the exercise asks for it)
 # ──────────────────────────────────────────────────────────────────────────────
 echo "🌱 Seed netpol…"
 kubectl -n netpol apply -f - >/dev/null <<EOF
@@ -81,7 +81,7 @@ EOF
 # ──────────────────────────────────────────────────────────────────────────────
 echo "🌱 Seed trouble…"
 
-# T13 — image cassée (ImagePullBackOff)
+# T13 — broken image (ImagePullBackOff)
 kubectl -n trouble apply -f - >/dev/null <<EOF
 apiVersion: apps/v1
 kind: Deployment
@@ -96,7 +96,7 @@ spec:
       - { name: web, image: ${BAD_IMG}, ports: [{ containerPort: 80 }] }
 EOF
 
-# T14 — Service avec mauvais selector (0 endpoint)
+# T14 — Service with wrong selector (0 endpoint)
 kubectl -n trouble apply -f - >/dev/null <<EOF
 apiVersion: apps/v1
 kind: Deployment
@@ -114,11 +114,11 @@ apiVersion: v1
 kind: Service
 metadata: { name: api-svc, namespace: trouble }
 spec:
-  selector: { app: apiv1 }          # BUG : aucun Pod ne porte ce label
+  selector: { app: apiv1 }          # BUG : no Pod carries this label
   ports: [{ port: 80, targetPort: 80 }]
 EOF
 
-# T15 — Pod Pending (request mémoire délirante)
+# T15 — Pod Pending (absurd memory request)
 kubectl -n trouble apply -f - >/dev/null <<EOF
 apiVersion: v1
 kind: Pod
@@ -130,7 +130,7 @@ spec:
     resources: { requests: { memory: "100Gi", cpu: "50" } }   # BUG : inschedulable
 EOF
 
-# T16 — Deployment bloqué : ConfigMap de volume manquante (CreateContainerConfigError)
+# T16 — Deployment stuck: missing volume ConfigMap (CreateContainerConfigError)
 kubectl -n trouble apply -f - >/dev/null <<EOF
 apiVersion: apps/v1
 kind: Deployment
@@ -147,11 +147,11 @@ spec:
         volumeMounts: [{ name: cfg, mountPath: /etc/appcfg }]
       volumes:
       - name: cfg
-        configMap: { name: cfg-app-config }   # BUG : cette ConfigMap n'existe pas
+        configMap: { name: cfg-app-config }   # BUG : this ConfigMap does not exist
 EOF
 
 echo
-echo "✅ Environnement d'examen prêt."
-echo "   • Ouvre le sujet : lab-setup/mock-exam/exam-01/EXAM.md"
-echo "   • Chrono conseillé : 2 h."
-echo "   • Correction à la fin : bash /vagrant/mock-exam/exam-01/grade.sh"
+echo "✅ Exam environment ready."
+echo "   • Open the exam: lab-setup/mock-exam/exam-01/EXAM.md"
+echo "   • Suggested timer: 2 h."
+echo "   • Grade at the end: bash /vagrant/mock-exam/exam-01/grade.sh"

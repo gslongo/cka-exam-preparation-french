@@ -2,6 +2,8 @@
 
 > Provisionnement automatique d'un cluster **1 CP + 2 workers** sur ta machine hôte via Vagrant/VirtualBox. Reproduit l'environnement de l'exam CKA (kubeadm, containerd, Calico), impossible à tester sur EKS.
 
+> 🇬🇧 **Langue** : les énoncés, solutions et correcteurs des **labs** ([labs/](labs/)) et **examens blancs** ([mock-exam/](mock-exam/)) sont **volontairement en anglais** (style CKA, pour s'habituer aux énoncés du jour J) ; le reste de la doc reste en français.
+
 ---
 
 ## Prérequis machine hôte
@@ -84,8 +86,8 @@ Le dossier [labs/](labs/) contient des **labs ciblés** sur un thème (à la dif
 - [labs/lab-services-ingress-gateway/](labs/lab-services-ingress-gateway/) — **Services · Ingress · Gateway API** (100 pts, objectif 75 %). Services testés en direct (connectivité) ; Ingress/Gateway notés sur l'objet (aucun contrôleur installé). Installe au besoin les CRD Gateway API.
 - [labs/lab-storage-config-multicontainer/](labs/lab-storage-config-multicontainer/) — **Stockage · ConfigMap/Secrets · Sidecars** (100 pts, objectif 75 %). Binding statique PV/PVC et Pods testés en direct ; StorageClass notée sur l'objet (aucun provisioner CSI). Inclut la récupération d'un PV `Released` (claimRef) et le sidecar natif (K8s 1.29+).
 - [labs/lab-troubleshooting/](labs/lab-troubleshooting/) — **🔧 Troubleshooting transverse** (100 pts, objectif 75 %). **Tout est cassé au départ**, à diagnostiquer et réparer : 16 pannes réparties sur les 4 domaines (RBAC, static pod sur `cp1`, noeud `w1` hors service, finalizer, `ImagePull`/`CrashLoop`/config, `Pending`, readiness, selector/`targetPort`/NetworkPolicy/DNS, PVC). Tout est réparable depuis `cp1` + `kubectl` et testé en direct.
-- [labs/lab-cluster-maintenance/](labs/lab-cluster-maintenance/) — **🛠️ Cluster Maintenance, etcd & Security** *(en anglais, style CKA)* — domaine 01 (100 pts, objectif 75 %). Lab **opérationnel** : tu exécutes de vraies opérations d'admin (backup/restore etcd via `exec` dans le pod `etcd-cp1`, approbation de CSR, RBAC ClusterRole/Role, `drain` de `w1`, static pod sur `cp1`). Tout se pilote depuis `cp1`.
-- [labs/lab-workloads-scheduling/](labs/lab-workloads-scheduling/) — **📦 Workloads & Scheduling** *(en anglais, style CKA)* — domaine 02 (100 pts, objectif 75 %). Lab **build** : tu construis 12 objets (Deployment + scale, `RollingUpdate`, DaemonSet, Job/CronJob, HPA, QoS, `nodeSelector`, `nodeAffinity`, taint+toleration, `topologySpreadConstraints`, `PriorityClass`). Placement vérifié sur `w1`/`w2`.
+- [labs/lab-cluster-maintenance/](labs/lab-cluster-maintenance/) — **🛠️ Cluster Maintenance, etcd & Security** — domaine 01 (100 pts, objectif 75 %). Lab **opérationnel** : tu exécutes de vraies opérations d'admin (backup/restore etcd via `exec` dans le pod `etcd-cp1`, approbation de CSR, RBAC ClusterRole/Role, `drain` de `w1`, static pod sur `cp1`). Tout se pilote depuis `cp1`.
+- [labs/lab-workloads-scheduling/](labs/lab-workloads-scheduling/) — **📦 Workloads & Scheduling** — domaine 02 (100 pts, objectif 75 %). Lab **build** : tu construis 12 objets (Deployment + scale, `RollingUpdate`, DaemonSet, Job/CronJob, HPA, QoS, `nodeSelector`, `nodeAffinity`, taint+toleration, `topologySpreadConstraints`, `PriorityClass`). Placement vérifié sur `w1`/`w2`.
 
 ```bash
 # Préparer / se corriger (même principe que les examens)
@@ -100,11 +102,11 @@ vagrant ssh cp1 -c "bash /vagrant/labs/lab-storage-config-multicontainer/grade.s
 vagrant ssh cp1 -c "bash /vagrant/labs/lab-troubleshooting/setup.sh"
 vagrant ssh cp1 -c "bash /vagrant/labs/lab-troubleshooting/grade.sh"
 
-# Lab Cluster Maintenance, etcd & Security (domaine 01, en anglais)
+# Lab Cluster Maintenance, etcd & Security (domaine 01)
 vagrant ssh cp1 -c "bash /vagrant/labs/lab-cluster-maintenance/setup.sh"
 vagrant ssh cp1 -c "bash /vagrant/labs/lab-cluster-maintenance/grade.sh"
 
-# Lab Workloads & Scheduling (domaine 02, en anglais)
+# Lab Workloads & Scheduling (domaine 02)
 vagrant ssh cp1 -c "bash /vagrant/labs/lab-workloads-scheduling/setup.sh"
 vagrant ssh cp1 -c "bash /vagrant/labs/lab-workloads-scheduling/grade.sh"
 ```

@@ -1,11 +1,11 @@
-# ✅ Lab — Stockage · ConfigMap/Secrets · Sidecars · SOLUTIONS
+# ✅ Lab — Storage · ConfigMap/Secrets · Sidecars · SOLUTIONS
 
-> **N'ouvre ce fichier qu'après ta tentative.** Chaque solution correspond exactement aux critères de `grade.sh`.
-> Toutes les commandes sont à lancer depuis `cp1` (`vagrant ssh cp1`).
+> **Open this file only after your attempt.** Each solution matches exactly the criteria of `grade.sh`.
+> All commands are to be run from `cp1` (`vagrant ssh cp1`).
 
 ---
 
-## 💾 Domaine A — Stockage persistant
+## 💾 Domain A — Persistent storage
 
 ### A1 — StorageClass `fast-local`
 ```bash
@@ -22,12 +22,12 @@ EOF
 
 kubectl get sc fast-local -o wide
 ```
-> Points clés : une *StorageClass* n'a **pas** de `spec` — `provisioner`, `reclaimPolicy`,
-> `volumeBindingMode` et `allowVolumeExpansion` sont au **premier niveau**. `WaitForFirstConsumer`
-> retarde le provisioning jusqu'au scheduling du Pod (indispensable en multi-AZ). Le provisioner ici
-> est illustratif : aucun volume ne sera réellement créé (on note l'objet).
+> Key points: a *StorageClass* has **no** `spec` — `provisioner`, `reclaimPolicy`,
+> `volumeBindingMode` and `allowVolumeExpansion` are **top-level**. `WaitForFirstConsumer`
+> delays provisioning until the Pod is scheduled (essential in multi-AZ). The provisioner here
+> is illustrative: no volume will actually be created (we grade the object).
 
-### A2 — Lier un PVC à un PV statique
+### A2 — Bind a PVC to a static PV
 ```bash
 kubectl -n storage-lab apply -f - <<'EOF'
 apiVersion: v1
@@ -45,11 +45,11 @@ EOF
 
 kubectl -n storage-lab get pvc app-data          # STATUS=Bound, VOLUME=pv-data
 ```
-> Points clés : binding **statique** = pas de provisioner. Le contrôleur choisit un PV compatible :
-> même `storageClassName` (`manual`), `accessModes` inclus (RWO), capacité **≥** demande (2Gi ≤ 5Gi).
-> On peut donc obtenir un PV **plus grand** que demandé.
+> Key points: **static** binding = no provisioner. The controller picks a compatible PV:
+> same `storageClassName` (`manual`), `accessModes` included (RWO), capacity **≥** request (2Gi ≤ 5Gi).
+> You can therefore get a PV **larger** than requested.
 
-### A3 — Consommer le PVC dans un Pod
+### A3 — Consume the PVC in a Pod
 ```bash
 kubectl -n storage-lab apply -f - <<'EOF'
 apiVersion: v1
@@ -71,24 +71,24 @@ spec:
 EOF
 
 kubectl -n storage-lab wait --for=condition=Ready pod/app --timeout=60s
-kubectl -n storage-lab exec app -- touch /data/ready        # crée le fichier attendu
+kubectl -n storage-lab exec app -- touch /data/ready        # create the expected file
 kubectl -n storage-lab exec app -- ls -l /data
 ```
-> Points clés : le Pod référence le PVC par `claimName` (il ne **possède** pas le PVC → le PVC survit au Pod).
-> Le fichier écrit dans `/data` vit sur le `hostPath` du node où atterrit le Pod (peu importe ici : on relit via `exec`).
+> Key points: the Pod references the PVC by `claimName` (it does not **own** the PVC → the PVC outlives the Pod).
+> The file written in `/data` lives on the `hostPath` of the node where the Pod lands (it doesn't matter here: we read it back via `exec`).
 
-### A4 — Récupérer un PV bloqué en `Released`
+### A4 — Recover a PV stuck in `Released`
 ```bash
-# 1) Diagnostic : le claimRef périmé bloque le rebinding
+# 1) Diagnosis: the stale claimRef blocks rebinding
 kubectl get pv pv-archive                                   # STATUS=Released
 kubectl get pv pv-archive -o jsonpath='{.spec.claimRef}{"\n"}'
 
-# 2) Retirer le claimRef → le PV repasse Available
+# 2) Remove the claimRef → the PV returns to Available
 kubectl patch pv pv-archive --type=json -p '[{"op":"remove","path":"/spec/claimRef"}]'
-#   (équivalent interactif : kubectl edit pv pv-archive  → supprimer tout le bloc spec.claimRef)
+#   (interactive equivalent: kubectl edit pv pv-archive  → delete the whole spec.claimRef block)
 kubectl get pv pv-archive                                   # STATUS=Available
 
-# 3) Nouveau PVC qui se lie au PV libéré
+# 3) New PVC that binds to the released PV
 kubectl -n storage-lab apply -f - <<'EOF'
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -105,16 +105,16 @@ EOF
 
 kubectl -n storage-lab get pvc archive                      # STATUS=Bound, VOLUME=pv-archive
 ```
-> Points clés : en `reclaimPolicy: Retain`, supprimer le PVC laisse le PV en **`Released`** avec un
-> `spec.claimRef` (namespace + name + **uid** obsolète) qui l'empêche de se rebinder — même à un PVC de
-> même nom (l'`uid` ne correspond plus). Retirer `claimRef` → `Available`, puis un PVC compatible s'y lie.
-> ⚠️ Les **données** restent sur le volume ; pour repartir propre, on nettoierait le backend d'abord.
+> Key points: with `reclaimPolicy: Retain`, deleting the PVC leaves the PV in **`Released`** with a
+> `spec.claimRef` (namespace + name + stale **uid**) that prevents it from rebinding — even to a PVC of
+> the same name (the `uid` no longer matches). Remove `claimRef` → `Available`, then a compatible PVC binds to it.
+> ⚠️ The **data** stays on the volume; to start clean, you would wipe the backend first.
 
 ---
 
-## ⚙️ Domaine B — ConfigMap & Secrets
+## ⚙️ Domain B — ConfigMap & Secrets
 
-### B1 — ConfigMap multi-clés
+### B1 — Multi-key ConfigMap
 ```bash
 kubectl -n config-lab create configmap app-config \
   --from-literal=APP_MODE=production \
@@ -123,10 +123,10 @@ kubectl -n config-lab create configmap app-config \
 
 kubectl -n config-lab get cm app-config -o yaml
 ```
-> Points clés : `--from-literal` par clé. (Autres sources utiles : `--from-file=cfg.properties`,
-> `--from-env-file=vars.env`.) Toutes ces clés sont des identifiants valides → réutilisables tels quels en `envFrom` (B3).
+> Key points: `--from-literal` per key. (Other useful sources: `--from-file=cfg.properties`,
+> `--from-env-file=vars.env`.) All these keys are valid identifiers → reusable as-is in `envFrom` (B3).
 
-### B2 — Secret Opaque
+### B2 — Opaque Secret
 ```bash
 kubectl -n config-lab create secret generic db-credentials \
   --from-literal=username=admin \
@@ -134,11 +134,11 @@ kubectl -n config-lab create secret generic db-credentials \
 
 kubectl -n config-lab get secret db-credentials -o jsonpath='{.data.password}' | base64 -d; echo
 ```
-> Points clés : `secret generic` = type **`Opaque`**. Les valeurs sont **base64** (encodage, **pas**
-> chiffrement) → toute personne pouvant lire le Secret voit la valeur. `create secret generic` encode
-> automatiquement ; en YAML brut on mettrait le base64 sous `data:` (ou le clair sous `stringData:`).
+> Key points: `secret generic` = type **`Opaque`**. The values are **base64** (encoding, **not**
+> encryption) → anyone able to read the Secret sees the value. `create secret generic` encodes
+> automatically; in raw YAML you would put the base64 under `data:` (or the plaintext under `stringData:`).
 
-### B3 — Injecter la config en variables d'environnement
+### B3 — Inject the config as environment variables
 ```bash
 kubectl -n config-lab apply -f - <<'EOF'
 apiVersion: v1
@@ -163,18 +163,18 @@ EOF
 
 kubectl -n config-lab exec api -- printenv APP_MODE MAX_CONNECTIONS DB_PASSWORD
 ```
-> Points clés : `envFrom` importe **toutes** les clés de la ConfigMap comme variables homonymes
-> (`APP_MODE`, `LOG_LEVEL`, `MAX_CONNECTIONS`). `secretKeyRef` cible **une** clé précise du Secret et la
-> renomme (`DB_PASSWORD`). ⚠️ Injecté en **variable d'env**, une valeur de ConfigMap/Secret est **figée**
-> à la création du Pod → un changement ultérieur nécessite `kubectl rollout restart` (ou recréer le Pod).
+> Key points: `envFrom` imports **all** the ConfigMap keys as variables of the same name
+> (`APP_MODE`, `LOG_LEVEL`, `MAX_CONNECTIONS`). `secretKeyRef` targets **one** specific key of the Secret and
+> renames it (`DB_PASSWORD`). ⚠️ Injected as an **env variable**, a ConfigMap/Secret value is **frozen**
+> at Pod creation → a later change requires `kubectl rollout restart` (or recreating the Pod).
 
-### B4 — Monter une ConfigMap en volume
+### B4 — Mount a ConfigMap as a volume
 ```bash
-# 1) ConfigMap avec un contenu de fichier (clé index.html)
+# 1) ConfigMap with file content (index.html key)
 kubectl -n config-lab create configmap web-index \
   --from-literal=index.html='<h1>CKA Storage Lab</h1>'
 
-# 2) Pod nginx qui monte la ConfigMap sur le docroot
+# 2) nginx Pod that mounts the ConfigMap on the docroot
 kubectl -n config-lab apply -f - <<'EOF'
 apiVersion: v1
 kind: Pod
@@ -195,17 +195,17 @@ EOF
 
 kubectl -n config-lab exec web -- cat /usr/share/nginx/html/index.html
 ```
-> Points clés : une ConfigMap montée en **volume** expose **chaque clé → un fichier** (`mountPath/<clé>`,
-> contenu = valeur). La clé `index.html` devient donc `/usr/share/nginx/html/index.html`. Options utiles :
-> `items:` (ne monter que certaines clés, éventuellement renommées via `path`), `defaultMode` (permissions),
-> `subPath` (monter **un** fichier sans masquer le dossier — mais casse la mise à jour à chaud).
-> Contrairement à `envFrom`, un volume ConfigMap est **rafraîchi** automatiquement (délai kubelet, sauf `subPath`).
+> Key points: a ConfigMap mounted as a **volume** exposes **each key → a file** (`mountPath/<key>`,
+> content = value). The `index.html` key thus becomes `/usr/share/nginx/html/index.html`. Useful options:
+> `items:` (mount only certain keys, optionally renamed via `path`), `defaultMode` (permissions),
+> `subPath` (mount **one** file without masking the directory — but breaks hot reload).
+> Unlike `envFrom`, a ConfigMap volume is **refreshed** automatically (kubelet delay, except `subPath`).
 
 ---
 
-## 🧩 Domaine C — Sidecars & Pods multi-conteneurs
+## 🧩 Domain C — Sidecars & multi-container Pods
 
-### C1 — Deux conteneurs partageant un `emptyDir`
+### C1 — Two containers sharing an `emptyDir`
 ```bash
 kubectl -n multi-lab apply -f - <<'EOF'
 apiVersion: v1
@@ -233,11 +233,11 @@ EOF
 
 kubectl -n multi-lab exec shared-logs -c sidecar -- head /var/log/app/app.log
 ```
-> Points clés : un `emptyDir` est un volume **éphémère partagé** par tous les conteneurs du Pod (créé au
-> démarrage du Pod, effacé à sa suppression). Le **même** volume monté aux deux conteneurs = canal d'échange
-> writer→reader (patron classique du log shipper). `emptyDir.medium: Memory` = tmpfs (compté dans `limits.memory`).
+> Key points: an `emptyDir` is an **ephemeral volume shared** by all containers of the Pod (created at
+> Pod startup, erased on its deletion). The **same** volume mounted in both containers = a writer→reader
+> exchange channel (the classic log shipper pattern). `emptyDir.medium: Memory` = tmpfs (counted in `limits.memory`).
 
-### C2 — Sidecar « natif » (initContainer `restartPolicy: Always`)
+### C2 — "Native" sidecar (initContainer `restartPolicy: Always`)
 ```bash
 kubectl -n multi-lab apply -f - <<'EOF'
 apiVersion: v1
@@ -257,13 +257,13 @@ EOF
 
 kubectl -n multi-lab get pod web-agent -o jsonpath='{.status.initContainerStatuses[0].state}{"\n"}'
 ```
-> Points clés : depuis K8s **1.29**, un `initContainer` avec **`restartPolicy: Always`** est un **sidecar
-> natif** : il démarre **avant** les conteneurs principaux (comme un init) **mais** reste vivant tout le
-> long (contrairement à un initContainer classique qui doit se terminer). Avantages vs le patron « 2ᵉ
-> conteneur » : ordre de démarrage garanti, ne bloque pas la fin d'un Job, cycle de vie géré par le kubelet.
+> Key points: since K8s **1.29**, an `initContainer` with **`restartPolicy: Always`** is a **native
+> sidecar**: it starts **before** the main containers (like an init) **but** stays alive the whole
+> time (unlike a classic initContainer, which must terminate). Advantages vs the "2nd
+> container" pattern: guaranteed startup order, doesn't block a Job from finishing, lifecycle managed by the kubelet.
 
 ---
 
-> 💡 Rappel : aucun provisioner CSI n'est installé — la *StorageClass* (A1) est notée sur l'**objet**,
-> tandis que le binding statique (A2/A4) et les Pods (A3, B3, B4, C1, C2) sont validés **en direct**.
-> En production, un provisioner (local-path, EBS CSI, Ceph…) matérialiserait le stockage dynamique.
+> 💡 Reminder: no CSI provisioner is installed — the *StorageClass* (A1) is graded on the **object**,
+> while the static binding (A2/A4) and the Pods (A3, B3, B4, C1, C2) are validated **live**.
+> In production, a provisioner (local-path, EBS CSI, Ceph…) would materialize dynamic storage.

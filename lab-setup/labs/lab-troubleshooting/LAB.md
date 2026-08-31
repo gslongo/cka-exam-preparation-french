@@ -1,146 +1,146 @@
-# 🔧 Lab — Troubleshooting transverse (tous domaines)
+# 🔧 Lab — Cross-cutting Troubleshooting (all domains)
 
-> **Lab thématique** (pas un examen blanc) : du **troubleshooting pur**. Au départ **tout est cassé** —
-> à toi de **diagnostiquer et réparer**. Les **16 pannes** couvrent **les 4 domaines techniques** du CKA
-> (Architecture/Nodes, Workloads/Scheduling, Services/Networking, Storage) : le message est justement que
-> *le troubleshooting est transverse*.
-> **100 pts**, objectif **≥ 75 %**. Pas de limite de temps — c'est un lab d'entraînement.
+> **Themed lab** (not a mock exam): **pure troubleshooting**. At the start **everything is broken** —
+> it's up to you to **diagnose and fix**. The **16 breakages** cover **all 4 technical domains** of the CKA
+> (Architecture/Nodes, Workloads/Scheduling, Services/Networking, Storage): the point is precisely that
+> *troubleshooting is cross-cutting*.
+> **100 pts**, target **≥ 75 %**. No time limit — this is a practice lab.
 
-> 🧩 **Indépendance** : chaque panne vit dans **son propre namespace** (`ts-arch`, `ts-nodes`, `ts-work`,
-> `ts-net`, `ts-netpol`, `ts-storage`) — tu peux en traiter **une seule** sans casser les autres. **Deux
-> exceptions** touchent au **noeud** et sont signalées : **A2** se répare **sur `cp1`** (`vagrant ssh cp1`,
-> manifest statique), **A3** concerne l'état du noeud **`w1`** (réparable via `kubectl`). Aucune tâche ne
-> dépend d'une autre.
+> 🧩 **Independence**: each breakage lives in **its own namespace** (`ts-arch`, `ts-nodes`, `ts-work`,
+> `ts-net`, `ts-netpol`, `ts-storage`) — you can tackle **just one** without breaking the others. **Two
+> exceptions** involve the **node** and are flagged: **A2** is fixed **on `cp1`** (`vagrant ssh cp1`,
+> static manifest), **A3** concerns the state of node **`w1`** (fixable via `kubectl`). No task
+> depends on another.
 
-> 🔎 **Tout est vérifié en direct** : le grader lit le **statut réel** (`Running`, `Bound`, endpoints) et
-> **`exec`** dans les Pods pour tester le **trafic** (services, NetworkPolicy) et le **DNS**. Il n'affiche
-> jamais la solution, seulement le **symptôme** observé.
+> 🔎 **Everything is checked live**: the grader reads the **real status** (`Running`, `Bound`, endpoints) and
+> **`exec`s** into the Pods to test **traffic** (services, NetworkPolicy) and **DNS**. It never
+> shows the solution, only the observed **symptom**.
 
-## Mise en place
+## Getting started
 ```bash
-vagrant ssh cp1 -c "bash /vagrant/labs/lab-troubleshooting/setup.sh"   # casse l'environnement (idempotent)
-# … tu répares les pannes …
-vagrant ssh cp1 -c "bash /vagrant/labs/lab-troubleshooting/grade.sh"   # correction (lecture seule)
+vagrant ssh cp1 -c "bash /vagrant/labs/lab-troubleshooting/setup.sh"   # breaks the environment (idempotent)
+# … you fix the breakages …
+vagrant ssh cp1 -c "bash /vagrant/labs/lab-troubleshooting/grade.sh"   # grade yourself (read-only)
 ```
-> `setup.sh` est **idempotent** : il **annule d'abord** toute réparation d'un run précédent (noeuds
-> décordonnés/dé-taintés, manifest statique retiré de `cp1`, finalizers débloqués), recrée les namespaces
-> et re-sème l'état **cassé**. Les solutions sont dans [`solutions/SOLUTIONS.md`](solutions/SOLUTIONS.md) — à n'ouvrir qu'après.
+> `setup.sh` is **idempotent**: it **first undoes** any repair from a previous run (nodes
+> uncordoned/un-tainted, static manifest removed from `cp1`, finalizers cleared), recreates the namespaces
+> and re-seeds the **broken** state. The solutions are in [`solutions/SOLUTIONS.md`](solutions/SOLUTIONS.md) — open it only afterwards.
 
-> 🧭 **Méthode** (rappel [fiche 05](../../../05-troubleshooting.md)) : `describe` → **Events** d'abord ;
-> `logs` / `logs -p` ; `Pending` ⇒ `describe pod` (ressources / taint / nodeSelector / cordon) ;
-> « pas de trafic » ⇒ `get endpoints` (selector/probes), `targetPort`, NetworkPolicy, DNS ; noeud ⇒ `describe node`.
+> 🧭 **Method** (recap [sheet 05](../../../05-troubleshooting.md)): `describe` → **Events** first;
+> `logs` / `logs -p`; `Pending` ⇒ `describe pod` (resources / taint / nodeSelector / cordon);
+> "no traffic" ⇒ `get endpoints` (selector/probes), `targetPort`, NetworkPolicy, DNS; node ⇒ `describe node`.
 
 ---
 
-## 🏛️ Domaine ARCH — Cluster Architecture & Nodes (28 pts)
+## 🏛️ Domain ARCH — Cluster Architecture & Nodes (28 pts)
 
-### A1 — RBAC : un ServiceAccount sans droits (8 pts) · ns `ts-arch`
-Le *ServiceAccount* **`deploy-bot`** doit pouvoir **lister** (`get`/`list`) les Pods de `ts-arch`, mais
-`kubectl auth can-i` répond **`no`**. Le *Role* et la *RoleBinding* existent pourtant. Répare l'attribution.
+### A1 — RBAC: a ServiceAccount with no permissions (8 pts) · ns `ts-arch`
+The *ServiceAccount* **`deploy-bot`** must be able to **list** (`get`/`list`) the Pods in `ts-arch`, but
+`kubectl auth can-i` returns **`no`**. Yet the *Role* and the *RoleBinding* both exist. Fix the binding.
 
 > 💡 `kubectl -n ts-arch auth can-i list pods --as=system:serviceaccount:ts-arch:deploy-bot`.
-> Compare le **sujet** de la RoleBinding au SA réel.
-> Objectif : `deploy-bot` peut **`list`** les pods mais **pas `delete`** (ne sur-attribue pas).
+> Compare the RoleBinding **subject** to the real SA.
+> Goal: `deploy-bot` can **`list`** pods but **not `delete`** (don't over-grant).
 
-### A2 — Static pod cassé sur `cp1` (8 pts) · ns `default` · **sur le noeud `cp1`**
-Le pod statique **`ts-static-cp1`** (dans `default`) n'arrive pas à démarrer. Corrige-le **sur le noeud
-`cp1`** pour qu'il passe `Running`.
+### A2 — Static pod broken on `cp1` (8 pts) · ns `default` · **on node `cp1`**
+The static pod **`ts-static-cp1`** (in `default`) fails to start. Fix it **on node
+`cp1`** so it goes `Running`.
 
-> 💡 `kubectl describe pod ts-static-cp1`. Un static pod se corrige **dans `/etc/kubernetes/manifests/`
-> sur le noeud** (pas via `kubectl`). Le kubelet recharge tout seul.
-> Objectif : `ts-static-cp1` **`Running`** avec une image valide.
+> 💡 `kubectl describe pod ts-static-cp1`. A static pod is fixed **in `/etc/kubernetes/manifests/`
+> on the node** (not via `kubectl`). The kubelet reloads it on its own.
+> Goal: `ts-static-cp1` **`Running`** with a valid image.
 
-### A3 — Noeud `w1` « hors service » (8 pts) · ns `ts-nodes`
-Le *Deployment* **`billing`** (namespace `ts-nodes`) reste à **0 disponible** : ses pods sont épinglés sur
-`w1`, mais **`w1` est en maintenance**. Remets le service en route.
+### A3 — Node `w1` "out of service" (8 pts) · ns `ts-nodes`
+The *Deployment* **`billing`** (namespace `ts-nodes`) stays at **0 available**: its pods are pinned to
+`w1`, but **`w1` is under maintenance**. Bring the service back up.
 
-> 💡 `kubectl -n ts-nodes describe pod -l app=billing` puis `kubectl describe node w1`. Il peut y avoir
-> **plusieurs blocages cumulés** sur le noeud. (Effets de taint : `NoSchedule` / `PreferNoSchedule` / `NoExecute`.)
-> Objectif : `billing` a **≥ 1 réplica disponible**.
+> 💡 `kubectl -n ts-nodes describe pod -l app=billing` then `kubectl describe node w1`. There may be
+> **several stacked blockers** on the node. (Taint effects: `NoSchedule` / `PreferNoSchedule` / `NoExecute`.)
+> Goal: `billing` has **≥ 1 available replica**.
 
-### A4 — Objet coincé en `Terminating` (4 pts) · ns `ts-arch`
-La *ConfigMap* **`stuck-cm`** de `ts-arch` a été supprimée mais reste **`Terminating`** indéfiniment.
-Fais en sorte qu'elle **disparaisse** réellement.
+### A4 — Object stuck in `Terminating` (4 pts) · ns `ts-arch`
+The *ConfigMap* **`stuck-cm`** in `ts-arch` was deleted but stays **`Terminating`** indefinitely.
+Make it **actually disappear**.
 
-> 💡 `kubectl -n ts-arch get cm stuck-cm -o yaml` → regarde `metadata.finalizers` + `deletionTimestamp`.
-> Objectif : `stuck-cm` n'existe plus.
+> 💡 `kubectl -n ts-arch get cm stuck-cm -o yaml` → look at `metadata.finalizers` + `deletionTimestamp`.
+> Goal: `stuck-cm` no longer exists.
 
 ---
 
-## 📦 Domaine WORK — Workloads & Scheduling (32 pts) · ns `ts-work`
+## 📦 Domain WORK — Workloads & Scheduling (32 pts) · ns `ts-work`
 
 ### W1 — `ImagePullBackOff` (6 pts)
-Le *Deployment* **`web`** ne démarre pas (image introuvable). Corrige-le.
-> 💡 `describe deploy web`. Objectif : `web` **disponible** (≥ 1 réplica, image valide).
+The *Deployment* **`web`** won't start (image not found). Fix it.
+> 💡 `describe deploy web`. Goal: `web` **available** (≥ 1 replica, valid image).
 
 ### W2 — `CrashLoopBackOff` (6 pts)
-Le *Pod* **`crasher`** redémarre en boucle. Rends-le durablement `Running`.
-> 💡 `kubectl -n ts-work logs crasher -p`. La commande du conteneur est en cause.
-> Objectif : `crasher` **`Running`** (stable).
+The *Pod* **`crasher`** keeps restarting. Make it stay `Running`.
+> 💡 `kubectl -n ts-work logs crasher -p`. The container's command is the cause.
+> Goal: `crasher` **`Running`** (stable).
 
 ### W3 — `CreateContainerConfigError` (6 pts)
-Le *Pod* **`checkout`** ne crée pas son conteneur : il injecte `DB_PASSWORD` depuis un *Secret*, mais
-**une clé manque**. Répare pour qu'il démarre avec la variable présente.
-> 💡 `describe pod checkout` (Events). Objectif : `checkout` **`Running`** et `DB_PASSWORD` bien injectée.
+The *Pod* **`checkout`** fails to create its container: it injects `DB_PASSWORD` from a *Secret*, but
+**a key is missing**. Fix it so it starts with the variable present.
+> 💡 `describe pod checkout` (Events). Goal: `checkout` **`Running`** with `DB_PASSWORD` properly injected.
 
-### W4 — `Pending` (ressources) (5 pts)
-Le *Pod* **`report`** reste `Pending` : personne ne peut l'héberger. Rends-le `Running`.
-> 💡 `describe pod report` → `Insufficient memory/cpu`. Objectif : `report` **`Running`**.
+### W4 — `Pending` (resources) (5 pts)
+The *Pod* **`report`** stays `Pending`: nothing can host it. Make it `Running`.
+> 💡 `describe pod report` → `Insufficient memory/cpu`. Goal: `report` **`Running`**.
 
-### W5 — `Pending` (contrainte de placement) (5 pts)
-Le *Pod* **`analytics`** reste `Pending` à cause d'une **contrainte de placement** qu'aucun noeud ne
-satisfait. Rends-le `Running`.
-> 💡 `describe pod analytics` → `didn't match node selector`. Objectif : `analytics` **`Running`**.
+### W5 — `Pending` (placement constraint) (5 pts)
+The *Pod* **`analytics`** stays `Pending` because of a **placement constraint** that no node
+satisfies. Make it `Running`.
+> 💡 `describe pod analytics` → `didn't match node selector`. Goal: `analytics` **`Running`**.
 
-### W6 — Pods `Running` mais jamais `Ready` (4 pts)
-Le *Deployment* **`frontend`** a ses pods `Running` mais **`0/1 READY`** — donc aucun trafic. Corrige la
-cause pour qu'ils deviennent `Ready`.
-> 💡 `describe pod -l app=frontend` → section `Readiness`. Objectif : `frontend` a **≥ 1 réplica Ready**.
+### W6 — Pods `Running` but never `Ready` (4 pts)
+The *Deployment* **`frontend`** has its pods `Running` but **`0/1 READY`** — so no traffic. Fix the
+cause so they become `Ready`.
+> 💡 `describe pod -l app=frontend` → `Readiness` section. Goal: `frontend` has **≥ 1 Ready replica**.
 
 ---
 
-## 🌐 Domaine NET — Services & Networking (26 pts)
+## 🌐 Domain NET — Services & Networking (26 pts)
 
-### N1 — Service sans endpoints (7 pts) · ns `ts-net`
-Le *Service* **`api-svc`** n'a **aucun endpoint** alors que le Deployment `api` tourne. Rétablis-les.
+### N1 — Service with no endpoints (7 pts) · ns `ts-net`
+The *Service* **`api-svc`** has **no endpoints** even though the `api` Deployment is running. Restore them.
 > 💡 `kubectl -n ts-net get endpoints api-svc` + `get pods --show-labels`.
-> Objectif : `api-svc` a **≥ 1 endpoint**.
+> Goal: `api-svc` has **≥ 1 endpoint**.
 
-### N2 — Service qui ne route pas (7 pts) · ns `ts-net`
-Le *Service* **`shop-svc`** a bien des endpoints, mais un `wget` depuis **`shop-client`** échoue. Répare
-le routage.
-> 💡 `kubectl -n ts-net exec shop-client -- wget -T4 -qO- http://shop-svc`. Compare `port`/`targetPort` au port réel du conteneur.
-> Objectif : `shop-client` **joint** `shop-svc`.
+### N2 — Service that doesn't route (7 pts) · ns `ts-net`
+The *Service* **`shop-svc`** does have endpoints, but a `wget` from **`shop-client`** fails. Fix
+the routing.
+> 💡 `kubectl -n ts-net exec shop-client -- wget -T4 -qO- http://shop-svc`. Compare `port`/`targetPort` to the container's real port.
+> Goal: `shop-client` **reaches** `shop-svc`.
 
-### N3 — Trafic bloqué par une NetworkPolicy (7 pts) · ns `ts-netpol`
-Dans `ts-netpol`, le Pod **`client`** ne peut plus joindre **`backend`** : une *NetworkPolicy* bloque tout.
-Autorise le flux **`client → backend`** (sans tout ré-ouvrir).
-> 💡 `kubectl -n ts-netpol get netpol` ; teste `exec client -- wget -T4 -qO- http://backend`.
-> Objectif : `client` **joint** `backend` (le trafic passe).
+### N3 — Traffic blocked by a NetworkPolicy (7 pts) · ns `ts-netpol`
+In `ts-netpol`, the Pod **`client`** can no longer reach **`backend`**: a *NetworkPolicy* blocks everything.
+Allow the **`client → backend`** flow (without re-opening everything).
+> 💡 `kubectl -n ts-netpol get netpol`; test `exec client -- wget -T4 -qO- http://backend`.
+> Goal: `client` **reaches** `backend` (traffic flows).
 
-### N4 — Résolution DNS cassée (5 pts) · ns `ts-net`
-Le *Pod* **`dns-broken`** ne résout **aucun** service du cluster (`*.svc.cluster.local`). Répare sa
-résolution DNS.
-> 💡 `kubectl -n ts-net exec dns-broken -- nslookup kubernetes.default` ; regarde `spec.dnsPolicy`.
-> Objectif : `dns-broken` **résout** `kubernetes.default.svc.cluster.local`.
+### N4 — Broken DNS resolution (5 pts) · ns `ts-net`
+The *Pod* **`dns-broken`** resolves **no** cluster service (`*.svc.cluster.local`). Fix its
+DNS resolution.
+> 💡 `kubectl -n ts-net exec dns-broken -- nslookup kubernetes.default`; look at `spec.dnsPolicy`.
+> Goal: `dns-broken` **resolves** `kubernetes.default.svc.cluster.local`.
 
 ---
 
-## 💾 Domaine STO — Storage (14 pts) · ns `ts-storage`
+## 💾 Domain STO — Storage (14 pts) · ns `ts-storage`
 
-### S1 — PVC bloquée en `Pending` (7 pts)
-La *PVC* **`data`** reste `Pending` : elle ne trouve pas de volume. Fais en sorte qu'elle se **lie**.
-> 💡 `describe pvc data`. Il existe un PV `pv-small` — compare sa `storageClassName` à celle demandée.
-> Objectif : `data` est **`Bound`**.
+### S1 — PVC stuck in `Pending` (7 pts)
+The *PVC* **`data`** stays `Pending`: it can't find a volume. Make it **bind**.
+> 💡 `describe pvc data`. A PV `pv-small` exists — compare its `storageClassName` to the requested one.
+> Goal: `data` is **`Bound`**.
 
-### S2 — Pod bloqué : PVC manquante (7 pts)
-Le *Pod* **`app`** reste en `ContainerCreating` : il monte une PVC qui **n'existe pas**. Répare pour qu'il
-démarre (un PV `pv-app` est disponible).
+### S2 — Pod stuck: missing PVC (7 pts)
+The *Pod* **`app`** stays in `ContainerCreating`: it mounts a PVC that **doesn't exist**. Fix it so it
+starts (a PV `pv-app` is available).
 > 💡 `describe pod app` → `persistentvolumeclaim "…" not found`.
-> Objectif : `app` **`Running`**.
+> Goal: `app` **`Running`**.
 
 ---
 
-> 🧪 Ce lab est **extensible** : d'autres pannes classiques (kubelet `NotReady`, `etcd`/certificats,
-> CoreDNS `Corefile`, `kube-proxy`) demandent un accès **système** aux workers et sont traitées dans les
-> **examens blancs** (`lab-setup/mock-exam/`). Ici, tout est réparable depuis `cp1` + `kubectl`.
+> 🧪 This lab is **extensible**: other classic breakages (kubelet `NotReady`, `etcd`/certificates,
+> CoreDNS `Corefile`, `kube-proxy`) require **system** access to the workers and are covered in the
+> **mock exams** (`lab-setup/mock-exam/`). Here, everything is fixable from `cp1` + `kubectl`.
