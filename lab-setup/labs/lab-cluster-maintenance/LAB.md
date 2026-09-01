@@ -46,7 +46,12 @@ Restore the snapshot from Task 1 into a **new** data directory **`/var/lib/etcd/
 
 ### Task 3 — Approve a certificate request (12 pts)
 A `CertificateSigningRequest` named **`applicant`** is **Pending**. Approve it so that a
-client certificate is issued (its `.status.certificate` becomes populated).
+client certificate is issued (its `.status.certificate` becomes populated), then save the
+**decoded** certificate to **`/opt/cka/applicant.crt`**.
+
+> 💡 `.status.certificate` is base64-encoded PEM.
+> ⚠️ Kubernetes **garbage-collects approved CSRs after ~1 h** — the saved file is your
+> durable proof for the grader (and a classic exam move: extracting an issued cert).
 
 ### Task 6 — Report a certificate's expiry (12 pts)
 Find the expiration date of the **kube-apiserver** certificate and write **that date**
@@ -83,9 +88,11 @@ workloads** (a Deployment `legacy-app` is currently running there). Afterwards `
 
 ### Task 8 — Run a static pod (12 pts)
 Create a **static pod** named **`web-static`** on **cp1** using image **`nginx:1.29-alpine`**
-(container port 80). It must end up **Running** and be managed by the kubelet (not the API).
+(container port 80), in the **`default`** namespace. It must end up **Running** and be managed
+by the kubelet (not the API).
 
 > 💡 Remember where the kubelet reads static-pod manifests, and how the mirror pod is named.
+> A manifest without `metadata.namespace` lands in `default` — which is what is expected here.
 
 ---
 

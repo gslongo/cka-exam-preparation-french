@@ -9,6 +9,7 @@
 - [🧠 Concepts clés](#-concepts-clés)
   - [Considérations d'installation (checklist pré-déploiement)](#considérations-dinstallation-checklist-pré-déploiement)
   - [HA — Stacked vs external etcd](#ha--stacked-vs-external-etcd)
+  - [etcd — Backup & restore (mono-nœud & cluster HA)](#etcd--backup--restore-mono-nœud--cluster-ha)
   - [CRI · CNI · CSI · Device Plugins](#cri--cni--csi--device-plugins)
   - [Composants du control plane](#composants-du-control-plane)
   - [Composants d'un worker](#composants-dun-worker)
@@ -66,6 +67,86 @@ Avant de lancer `kubeadm init`, 5 décisions structurantes (LFS258) :
 - **Quorum etcd** = `(N/2) + 1`. Toujours un **nombre impair** de membres (3, 5, 7).
 - Recommandation prod : **5 membres etcd** (tolère 2 pertes).
 - **LB en façade** des apiservers = **L4 / TCP pass-through** (HAProxy/nginx en mode TCP), **pas** L7 avec terminaison TLS — l'apiserver gère lui-même la mTLS. Adresse du LB = `controlPlaneEndpoint`.
+
+### etcd — Backup & restore (mono-nœud & cluster HA)
+
+> ⭐ Tâche quasi garantie à l'exam. Pratique : [lab-cluster-maintenance](lab-setup/labs/lab-cluster-maintenance/LAB.md).
+
+**Backup** (sur le node CP ; certs etcd requis car mTLS) :
+
+```bash
+ETCDCTL_API=3 etcdctl snapshot save /var/backups/etcd.db \
+  --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/server.crt \
+  --key=/etc/kubernetes/pki/etcd/server.key
+
+etcdutl snapshot status /var/backups/etcd.db -w table   # vérifier hash/revision/keys
+```
+
+> 💡 **`etcdctl` vs `etcdutl`** : `etcdctl` = opérations **en ligne** (save, santé, membres) ; `etcdutl` = opérations **hors-ligne sur fichiers** (status, restore). Depuis etcd 3.5+, `etcdctl snapshot restore` est **déprécié** au profit d'`etcdutl snapshot restore` (les deux marchent encore à l'exam).
+
+**Restore mono-nœud (cas CKA — 1 CP, etcd stacked en static pod)** :
+
+```bash
+# 1. Stopper apiserver + etcd : déplacer les manifests hors du dossier surveillé
+sudo mv /etc/kubernetes/manifests/{etcd.yaml,kube-apiserver.yaml} /tmp/
+
+# 2. Restaurer vers un NOUVEAU data-dir (jamais par-dessus l'existant)
+sudo etcdutl snapshot restore /var/backups/etcd.db --data-dir=/var/lib/etcd-restore
+
+# 3. Éditer /tmp/etcd.yaml : hostPath du volume etcd-data → /var/lib/etcd-restore
+#    (le flag --data-dir du conteneur suit le volume, vérifier les deux)
+
+# 4. Remettre les manifests → le kubelet relance les static pods
+sudo mv /tmp/{etcd.yaml,kube-apiserver.yaml} /etc/kubernetes/manifests/
+```
+
+**Restore cluster HA (3 membres)** — le point que tout le monde oublie : un restore ne « répare » pas un membre, il **bootstrappe un cluster neuf** à partir du snapshot. Il faut donc le faire sur **tous les membres en même temps** :
+
+1. **Arrêter tous les membres** (les 3 etcd + les apiservers qui pointent dessus).
+2. Copier **le même snapshot** sur chaque node.
+3. Sur **chaque membre**, restaurer avec **son identité** et la **liste complète** du cluster :
+
+```bash
+# Sur etcd1 (10.0.0.11) — adapter --name et les URLs sur etcd2/etcd3 :
+sudo etcdutl snapshot restore /var/backups/etcd.db \
+  --name etcd1 \
+  --data-dir /var/lib/etcd-restore \
+  --initial-cluster etcd1=https://10.0.0.11:2380,etcd2=https://10.0.0.12:2380,etcd3=https://10.0.0.13:2380 \
+  --initial-cluster-token etcd-restored-1 \
+  --initial-advertise-peer-urls https://10.0.0.11:2380
+```
+
+4. Repointer chaque membre sur le nouveau `data-dir` puis **redémarrer les 3 quasi simultanément** (élection de leader → quorum), enfin relancer les apiservers.
+
+> 🔎 **Où trouver ces valeurs ?** (names, IPs, peer-URLs)
+>
+> ```bash
+> # Cluster encore vivant : la source la plus directe
+> ETCDCTL_API=3 etcdctl member list -w table \
+>   --endpoints=https://127.0.0.1:2379 \
+>   --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+>   --cert=/etc/kubernetes/pki/etcd/server.crt \
+>   --key=/etc/kubernetes/pki/etcd/server.key
+> # → colonnes NAME et PEER ADDRS = exactement ce qu'attend --initial-cluster
+>
+> # Cluster mort : lire les flags du manifest/service etcd de chaque membre
+> grep -E 'name|initial-cluster|peer-urls' /etc/kubernetes/manifests/etcd.yaml   # etcd stacked
+> systemctl cat etcd | grep -E 'name|initial-cluster|peer-urls'                  # etcd external (systemd)
+> ```
+>
+> En kubeadm stacked, `--name` = le **hostname du node** et les peer-URLs sont déjà présentes dans `etcd.yaml` — recopie-les telles quelles.
+
+| Flag | Règle |
+|---|---|
+| snapshot | Le **même fichier** sur les 3 membres |
+| `--name` | **Unique** par membre |
+| `--initial-cluster` | **Identique** partout : la liste complète des 3 peers |
+| `--initial-cluster-token` | **Nouveau** token commun — empêche d'anciens membres « fantômes » de rejoindre |
+| `--initial-advertise-peer-urls` | Propre à chaque membre (son URL :2380) |
+
+> 💡 Le snapshot peut provenir de **n'importe quel membre** (données répliquées par Raft). Après restore, les member IDs changent mais les données/révisions sont conservées.
 
 ### CRI · CNI · CSI · Device Plugins
 
@@ -540,10 +621,13 @@ cgroupDriver: systemd     # doit correspondre au runtime (containerd)
 ### Certificats
 - Certs kubeadm **expirent après 1 an**. `kubeadm upgrade` les renouvelle automatiquement, sinon `kubeadm certs renew all` + restart kubelet.
 - Le cert du kubelet lui-même peut être auto-rotaté (`rotateCertificates: true` dans `KubeletConfiguration`).
+- **Aucun registre des certs émis via l'API CSR** : les CSR **approuvés sont garbage-collectés après ~1 h**, et K8s ne journalise pas les signatures de la CA → le cert devient **irrécupérable côté cluster**. Réflexe : **exporter immédiatement** après approbation (`kubectl get csr <name> -o jsonpath='{.status.certificate}' | base64 -d > cert.crt`). Les seuls inventaires consultables : les CSR encore présents (`kubectl get csr`), les certs kubeadm sur disque (`/etc/kubernetes/pki/` + `kubeadm certs check-expiration`) et ceux du kubelet (`/var/lib/kubelet/pki/`).
 
 ### etcd
 - Perte de **quorum** = cluster read-only. Toujours **3+ membres impairs**.
 - Ne **jamais** sauvegarder pendant un `defrag` en cours.
+- **Restore = cluster neuf**, pas une réparation : en HA, restaurer le **même snapshot sur tous les membres** avec `--initial-cluster`/`--initial-cluster-token` cohérents (voir [la section dédiée](#etcd--backup--restore-mono-nœud--cluster-ha)). Restaurer sur un seul membre d'un cluster HA → état divergent.
+- Toujours restaurer vers un **nouveau `--data-dir`** — jamais par-dessus `/var/lib/etcd` existant.
 
 ### 🔒 Encryption at rest des Secrets (etcd)
 

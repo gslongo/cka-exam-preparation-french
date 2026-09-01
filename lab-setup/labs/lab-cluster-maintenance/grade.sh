@@ -39,13 +39,21 @@ fi
 dom CERTS 24 "🔐 Certificates & CSR"
 
 # T3 — CSR 'applicant' approved and issued (12)
+# K8s garbage-collects APPROVED CSRs after ~1 h → the exported certificate file
+# is accepted as durable evidence when the CSR object is already gone.
 d=CERTS
 appr=$(jp get csr applicant -o jsonpath='{.status.conditions[?(@.type=="Approved")].status}')
 cert=$(jp get csr applicant -o jsonpath='{.status.certificate}')
-if [ "$appr" = "True" ] && [ -n "$cert" ]; then
+file_ok=no
+if sudo test -f /opt/cka/applicant.crt \
+   && sudo openssl verify -CAfile /etc/kubernetes/pki/ca.crt /opt/cka/applicant.crt >/dev/null 2>&1 \
+   && sudo openssl x509 -in /opt/cka/applicant.crt -noout -subject 2>/dev/null | grep -q 'CN *= *applicant'; then
+  file_ok=yes
+fi
+if { [ "$appr" = "True" ] && [ -n "$cert" ]; } || [ "$file_ok" = "yes" ]; then
   pass 12 "T3 CSR — 'applicant' approved and certificate issued" $d
 else
-  fail 12 "T3 CSR — approve the pending CSR 'applicant' so a certificate is issued" $d "Approved=${appr:-∅}, certificate=$([ -n "$cert" ] && echo issued || echo empty)"
+  fail 12 "T3 CSR — approve the pending CSR 'applicant' and save the issued cert to /opt/cka/applicant.crt" $d "Approved=${appr:-∅}, certificate=$([ -n "$cert" ] && echo issued || echo empty), /opt/cka/applicant.crt=${file_ok} (note: approved CSRs are GC'd after ~1 h)"
 fi
 
 # T6 — kube-apiserver certificate expiration written to the report file (12)
@@ -102,9 +110,10 @@ fi
 
 # T8 — static pod on cp1 (12)
 d=NODES
-phase=$(jp get pod web-static-cp1 -o jsonpath='{.status.phase}')
-owner=$(jp get pod web-static-cp1 -o jsonpath='{.metadata.ownerReferences[0].kind}')
-img=$(jp get pod web-static-cp1 -o jsonpath='{.spec.containers[0].image}')
+# -n default: do not depend on the user's current kubeconfig context namespace
+phase=$(jp get pod web-static-cp1 -n default -o jsonpath='{.status.phase}')
+owner=$(jp get pod web-static-cp1 -n default -o jsonpath='{.metadata.ownerReferences[0].kind}')
+img=$(jp get pod web-static-cp1 -n default -o jsonpath='{.spec.containers[0].image}')
 if [ "$phase" = "Running" ] && [ "$owner" = "Node" ] && printf '%s' "$img" | grep -q 'nginx:1.29-alpine'; then
   pass 12 "T8 static pod — 'web-static-cp1' Running (managed by kubelet)" $d
 else

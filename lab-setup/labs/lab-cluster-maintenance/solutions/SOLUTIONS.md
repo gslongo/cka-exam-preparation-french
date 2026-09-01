@@ -51,10 +51,14 @@ touching the live cluster. A *real* recovery would then stop the API server, poi
 kubectl get csr applicant                 # CONDITION: Pending
 kubectl certificate approve applicant
 kubectl get csr applicant -o wide         # CONDITION: Approved,Issued
+
+# Export the issued certificate (base64 PEM → decoded file)
+kubectl get csr applicant -o jsonpath='{.status.certificate}' | base64 -d > /opt/cka/applicant.crt
 ```
 **Key points**: a `CertificateSigningRequest` with signer `kubernetes.io/kube-apiserver-client`
 is signed automatically **once approved** by the controller-manager. `.status.certificate`
-then holds the issued cert (base64 PEM).
+then holds the issued cert (base64 PEM). ⚠️ Approved CSRs are **garbage-collected after ~1 h**
+— export the certificate right away; the file is what the grader trusts long-term.
 
 ### T6 — Report the kube-apiserver certificate expiration
 ```bash
