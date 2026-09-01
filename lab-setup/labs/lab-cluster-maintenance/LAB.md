@@ -2,7 +2,7 @@
 
 > **CKA domain 01 — Cluster Architecture, Installation & Configuration (25%).**
 > An **operational** lab: you run real cluster-admin tasks and grade the *result*.
-> **100 pts · target ≥ 75 %.** All work is done **on cp1**. **Estimated time: ~45 min – 1 h 15** (8 tasks).
+> **100 pts · target ≥ 75 %.** All work is done **on cp1**. **Estimated time: ~45 min – 1 h 15** (9 tasks).
 
 This lab complements the *Troubleshooting* lab (which repairs breakage): here you **operate**
 the cluster like an administrator — back up etcd, sign a certificate, wire up RBAC, take a
@@ -16,7 +16,7 @@ node out for maintenance and run a static pod.
 # from the host (lab-setup/)
 vagrant ssh cp1 -c "bash /vagrant/labs/lab-cluster-maintenance/setup.sh"   # seed the lab
 vagrant ssh cp1                                                            # work on cp1
-#   … perform the 8 tasks …
+#   … perform the 9 tasks …
 vagrant ssh cp1 -c "bash /vagrant/labs/lab-cluster-maintenance/grade.sh"   # grade yourself
 ```
 
@@ -29,9 +29,9 @@ vagrant ssh cp1 -c "bash /vagrant/labs/lab-cluster-maintenance/grade.sh"   # gra
 
 ---
 
-## 🗄️ etcd Backup & Restore (26 pts)
+## 🗄️ etcd Backup & Restore (24 pts)
 
-### Task 1 — Back up etcd (14 pts)
+### Task 1 — Back up etcd (12 pts)
 Save a snapshot of the cluster's etcd database to **`/var/lib/etcd/etcd-backup.db`**.
 Use the etcd server certificates under `/etc/kubernetes/pki/etcd/` and endpoint
 `https://127.0.0.1:2379`. The snapshot must be a **valid** etcd snapshot.
@@ -42,9 +42,9 @@ Restore the snapshot from Task 1 into a **new** data directory **`/var/lib/etcd/
 
 ---
 
-## 🔐 Certificates & CSR (24 pts)
+## 🔐 Certificates & CSR (22 pts)
 
-### Task 3 — Approve a certificate request (12 pts)
+### Task 3 — Approve a certificate request (10 pts)
 A `CertificateSigningRequest` named **`applicant`** is **Pending**. Approve it so that a
 client certificate is issued (its `.status.certificate` becomes populated), then save the
 **decoded** certificate to **`/opt/cka/applicant.crt`**.
@@ -61,9 +61,9 @@ Find the expiration date of the **kube-apiserver** certificate and write **that 
 
 ---
 
-## 👤 RBAC & Authorization (26 pts)
+## 👤 RBAC & Authorization (34 pts)
 
-### Task 4 — Cluster-wide read-only access (14 pts)
+### Task 4 — Cluster-wide read-only access (12 pts)
 Create a **ClusterRole** named **`pod-viewer`** allowing `get`, `list`, `watch` on **pods**,
 and bind it (**ClusterRoleBinding** `pod-viewer-binding`) to the **group `viewers`**.
 Members of `viewers` must be able to list pods in **every** namespace, but **not delete** them.
@@ -75,18 +75,27 @@ In namespace **`finance`**, grant the user **`auditor`** the ability to manage *
 (`get`, `list`, `create`, `update`). The grant must apply **only** in `finance` — `auditor`
 must **not** be able to create ConfigMaps in any other namespace.
 
+### Task 9 — ServiceAccount token (10 pts)
+In namespace **`finance`**, create a ServiceAccount **`robot`**, then write **a token** for it
+to **`/opt/cka/robot-token.txt`**. The file must contain **only the token value** (a single
+`eyJ…` line, nothing else).
+
+> 💡 `kubectl create token` issues a short-lived JWT for a ServiceAccount (since 1.24, SA
+> Secrets are no longer auto-created). The default duration is fine — the grader decodes the
+> token, it does not need it to still be valid.
+
 ---
 
-## 🖥️ Nodes & Static Pods (24 pts)
+## 🖥️ Nodes & Static Pods (20 pts)
 
-### Task 7 — Drain a node for maintenance (12 pts)
+### Task 7 — Drain a node for maintenance (10 pts)
 Node **`w1`** must be taken out of service for maintenance: **cordon it and evict its
 workloads** (a Deployment `legacy-app` is currently running there). Afterwards `w1` must be
 `SchedulingDisabled` and carry no `legacy-app` pods.
 
 > 💡 DaemonSet pods are expected to remain — the standard drain flags handle them.
 
-### Task 8 — Run a static pod (12 pts)
+### Task 8 — Run a static pod (10 pts)
 Create a **static pod** named **`web-static`** on **cp1** using image **`nginx:1.29-alpine`**
 (container port 80), in the **`default`** namespace. It must end up **Running** and be managed
 by the kubelet (not the API).

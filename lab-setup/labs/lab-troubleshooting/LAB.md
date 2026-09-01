@@ -1,10 +1,10 @@
 # 🔧 Lab — Cross-cutting Troubleshooting (all domains)
 
 > **Themed lab** (not a mock exam): **pure troubleshooting**. At the start **everything is broken** —
-> it's up to you to **diagnose and fix**. The **16 breakages** cover **all 4 technical domains** of the CKA
+> it's up to you to **diagnose and fix**. The **18 breakages** cover **all 4 technical domains** of the CKA
 > (Architecture/Nodes, Workloads/Scheduling, Services/Networking, Storage): the point is precisely that
 > *troubleshooting is cross-cutting*.
-> **100 pts**, target **≥ 75 %**. No time limit — this is a practice lab. **Estimated time: ~1 h 30 – 2 h** (16 breakages).
+> **100 pts**, target **≥ 75 %**. No time limit — this is a practice lab. **Estimated time: ~1 h 30 – 2 h** (18 breakages).
 
 > 🧩 **Independence**: each breakage lives in **its own namespace** (`ts-arch`, `ts-nodes`, `ts-work`,
 > `ts-net`, `ts-netpol`, `ts-storage`) — you can tackle **just one** without breaking the others. **Two
@@ -32,9 +32,9 @@ vagrant ssh cp1 -c "bash /vagrant/labs/lab-troubleshooting/grade.sh"   # grade y
 
 ---
 
-## 🏛️ Domain ARCH — Cluster Architecture & Nodes (28 pts)
+## 🏛️ Domain ARCH — Cluster Architecture & Nodes (25 pts)
 
-### A1 — RBAC: a ServiceAccount with no permissions (8 pts) · ns `ts-arch`
+### A1 — RBAC: a ServiceAccount with no permissions (7 pts) · ns `ts-arch`
 The *ServiceAccount* **`deploy-bot`** must be able to **list** (`get`/`list`) the Pods in `ts-arch`, but
 `kubectl auth can-i` returns **`no`**. Yet the *Role* and the *RoleBinding* both exist. Fix the binding.
 
@@ -42,7 +42,7 @@ The *ServiceAccount* **`deploy-bot`** must be able to **list** (`get`/`list`) th
 > Compare the RoleBinding **subject** to the real SA.
 > Goal: `deploy-bot` can **`list`** pods but **not `delete`** (don't over-grant).
 
-### A2 — Static pod broken on `cp1` (8 pts) · ns `default` · **on node `cp1`**
+### A2 — Static pod broken on `cp1` (7 pts) · ns `default` · **on node `cp1`**
 The static pod **`ts-static-cp1`** (in `default`) fails to start. Fix it **on node
 `cp1`** so it goes `Running`.
 
@@ -50,7 +50,7 @@ The static pod **`ts-static-cp1`** (in `default`) fails to start. Fix it **on no
 > on the node** (not via `kubectl`). The kubelet reloads it on its own.
 > Goal: `ts-static-cp1` **`Running`** with a valid image.
 
-### A3 — Node `w1` "out of service" (8 pts) · ns `ts-nodes`
+### A3 — Node `w1` "out of service" (7 pts) · ns `ts-nodes`
 The *Deployment* **`billing`** (namespace `ts-nodes`) stays at **0 available**: its pods are pinned to
 `w1`, but **`w1` is under maintenance**. Bring the service back up.
 
@@ -67,13 +67,13 @@ Make it **actually disappear**.
 
 ---
 
-## 📦 Domain WORK — Workloads & Scheduling (32 pts) · ns `ts-work`
+## 📦 Domain WORK — Workloads & Scheduling (40 pts) · ns `ts-work`
 
-### W1 — `ImagePullBackOff` (6 pts)
+### W1 — `ImagePullBackOff` (5 pts)
 The *Deployment* **`web`** won't start (image not found). Fix it.
 > 💡 `describe deploy web`. Goal: `web` **available** (≥ 1 replica, valid image).
 
-### W2 — `CrashLoopBackOff` (6 pts)
+### W2 — `CrashLoopBackOff` (5 pts)
 The *Pod* **`crasher`** keeps restarting. Make it stay `Running`.
 > 💡 `kubectl -n ts-work logs crasher -p`. The container's command is the cause.
 > Goal: `crasher` **`Running`** (stable).
@@ -97,22 +97,41 @@ The *Deployment* **`frontend`** has its pods `Running` but **`0/1 READY`** — s
 cause so they become `Ready`.
 > 💡 `describe pod -l app=frontend` → `Readiness` section. Goal: `frontend` has **≥ 1 Ready replica**.
 
+### W7 — `OOMKilled` (5 pts)
+The *Pod* **`cruncher`** crash-loops: the app legitimately holds **~50 MiB** in memory
+(`/dev/shm`), but its **memory limit** is far too low. **Recreate** it with an adequate
+memory limit (e.g. **128Mi** — keep a limit, don't remove it). It must end up **Running
+and Ready with 0 restarts**.
+> 💡 `describe pod cruncher` → `container init was OOM-killed (memory limit too low?)`.
+> tmpfs (`/dev/shm`) pages **count against the pod's memory limit** — and they survive
+> container restarts. Pod resources are **immutable**: export the YAML, fix the limit,
+> `kubectl replace --force -f`.
+> Goal: `cruncher` **Running/Ready**, **0 restarts**, with a memory limit still set.
+
+### W8 — Crash caused by the `securityContext` (5 pts)
+The *Pod* **`locked-web`** (nginx) **crash-loops at startup**: its securityContext forces a
+user the image cannot run as. Fix the Pod so nginx starts — **keep the image
+`nginx:1.29-alpine`**.
+> 💡 `kubectl -n ts-work logs locked-web` → `permission denied` on nginx's working dirs.
+> The pod-level securityContext is **immutable** → recreate without the offending `runAsUser`
+> (or as root). Goal: `locked-web` **Running/Ready** with the same image.
+
 ---
 
-## 🌐 Domain NET — Services & Networking (26 pts)
+## 🌐 Domain NET — Services & Networking (23 pts)
 
-### N1 — Service with no endpoints (7 pts) · ns `ts-net`
+### N1 — Service with no endpoints (6 pts) · ns `ts-net`
 The *Service* **`api-svc`** has **no endpoints** even though the `api` Deployment is running. Restore them.
 > 💡 `kubectl -n ts-net get endpoints api-svc` + `get pods --show-labels`.
 > Goal: `api-svc` has **≥ 1 endpoint**.
 
-### N2 — Service that doesn't route (7 pts) · ns `ts-net`
+### N2 — Service that doesn't route (6 pts) · ns `ts-net`
 The *Service* **`shop-svc`** does have endpoints, but a `wget` from **`shop-client`** fails. Fix
 the routing.
 > 💡 `kubectl -n ts-net exec shop-client -- wget -T4 -qO- http://shop-svc`. Compare `port`/`targetPort` to the container's real port.
 > Goal: `shop-client` **reaches** `shop-svc`.
 
-### N3 — Traffic blocked by a NetworkPolicy (7 pts) · ns `ts-netpol`
+### N3 — Traffic blocked by a NetworkPolicy (6 pts) · ns `ts-netpol`
 In `ts-netpol`, the Pod **`client`** can no longer reach **`backend`**: a *NetworkPolicy* blocks everything.
 Allow the **`client → backend`** flow (without re-opening everything).
 > 💡 `kubectl -n ts-netpol get netpol`; test `kubectl -n ts-netpol exec client -- wget -T4 -qO- http://backend`.
@@ -126,14 +145,14 @@ DNS resolution.
 
 ---
 
-## 💾 Domain STO — Storage (14 pts) · ns `ts-storage`
+## 💾 Domain STO — Storage (12 pts) · ns `ts-storage`
 
-### S1 — PVC stuck in `Pending` (7 pts)
+### S1 — PVC stuck in `Pending` (6 pts)
 The *PVC* **`data`** stays `Pending`: it can't find a volume. Make it **bind**.
 > 💡 `describe pvc data`. A PV `pv-small` exists — compare its `storageClassName` to the requested one.
 > Goal: `data` is **`Bound`**.
 
-### S2 — Pod stuck: missing PVC (7 pts)
+### S2 — Pod stuck: missing PVC (6 pts)
 The *Pod* **`app`** stays in `ContainerCreating`: it mounts a PVC that **doesn't exist**. Fix it so it
 starts (a PV `pv-app` is available).
 > 💡 `describe pod app` → `persistentvolumeclaim "…" not found`.

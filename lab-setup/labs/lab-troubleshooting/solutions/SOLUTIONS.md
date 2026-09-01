@@ -130,6 +130,38 @@ kubectl -n ts-work patch deploy frontend --type=json \
 **Key points**: a failing **readinessProbe** leaves the pod `Running` but **NotReady** → it's removed
 from its Service's endpoints. The symptom ("no traffic") is network, the **cause** is the probe.
 
+### W7 — `cruncher` OOM-killed
+```bash
+kubectl -n ts-work get pod cruncher                    # CrashLoopBackOff, restarts climbing
+kubectl -n ts-work describe pod cruncher | grep -B1 -A3 'Last State'
+#   Reason: StartError — "container init was OOM-killed (memory limit too low?)"
+# Pod resources are immutable → export, raise the limit, recreate:
+kubectl -n ts-work get pod cruncher -o yaml > /tmp/cruncher.yaml
+#   edit: resources.requests.memory and resources.limits.memory → 128Mi
+kubectl replace --force -f /tmp/cruncher.yaml
+kubectl -n ts-work get pod cruncher                    # Running 1/1, RESTARTS 0
+```
+**Key points**: the app writes ~50Mi into `/dev/shm`, and **tmpfs pages count against the
+container's memory limit** — worse, they belong to the **pod sandbox**, so they survive container
+restarts: after the first OOM kill, every restart dies instantly (`StartError… init was
+OOM-killed`). Fix = a realistic limit, not removing limits. Pod `resources` are **immutable** →
+recreate (`kubectl replace --force`), the same lesson as W4.
+
+### W8 — `locked-web` crashes because of its securityContext
+```bash
+kubectl -n ts-work logs locked-web        # mkdir /var/cache/nginx/... permission denied
+kubectl -n ts-work get pod locked-web -o jsonpath='{.spec.securityContext}{"\n"}'   # runAsUser: 4321
+# securityContext is immutable → export, drop (or fix) it, recreate:
+kubectl -n ts-work get pod locked-web -o yaml > /tmp/locked-web.yaml
+#   edit: remove the pod-level securityContext block (nginx:1.29-alpine needs root to start)
+kubectl replace --force -f /tmp/locked-web.yaml
+kubectl -n ts-work get pod locked-web     # Running 1/1
+```
+**Key points**: the stock nginx image starts as **root** (then drops privileges for its workers);
+forcing an arbitrary `runAsUser` breaks its startup (`/var/cache/nginx`, `/run/nginx.pid`).
+Read the **container logs** — the crash reason is written there, not in the events. (A truly
+non-root nginx needs the `nginxinc/nginx-unprivileged` image — not allowed here.)
+
 ---
 
 ## 🌐 NET — Services & Networking

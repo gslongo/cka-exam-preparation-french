@@ -224,6 +224,36 @@ spec:
           periodSeconds: 5
 EOF
 
+# W7 — OOMKilled: the app needs ~50Mi in /dev/shm but the memory limit is 16Mi.
+echo "🌱 W7 (OOMKilled — memory limit too low)…"
+kubectl -n ts-work apply -f - >/dev/null 2>&1 <<EOF
+apiVersion: v1
+kind: Pod
+metadata: { name: cruncher, namespace: ts-work, labels: { app: cruncher } }
+spec:
+  containers:
+  - name: c
+    image: ${BUSYBOX}
+    command: ["sh","-c","dd if=/dev/zero of=/dev/shm/data bs=1M count=50 >/dev/null 2>&1; sleep 100000"]
+    resources:
+      requests: { memory: "32Mi" }
+      limits:   { memory: "32Mi" }   # BUG: tmpfs pages count against the limit → OOM-killed
+EOF
+
+# W8 — securityContext: nginx cannot start as an arbitrary non-root uid.
+echo "🌱 W8 (securityContext breaks startup)…"
+kubectl -n ts-work apply -f - >/dev/null 2>&1 <<EOF
+apiVersion: v1
+kind: Pod
+metadata: { name: locked-web, namespace: ts-work, labels: { app: locked-web } }
+spec:
+  securityContext: { runAsUser: 4321, runAsGroup: 4321 }   # BUG: this image needs root to start
+  containers:
+  - name: web
+    image: ${GOOD_IMG}
+    ports: [{ containerPort: 80 }]
+EOF
+
 # ══════════════════════════════════════════════════════════════════════════════
 # DOMAIN NET — Services & Networking
 # ══════════════════════════════════════════════════════════════════════════════

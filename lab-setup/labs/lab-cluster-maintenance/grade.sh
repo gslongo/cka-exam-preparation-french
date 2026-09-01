@@ -16,15 +16,15 @@ jp()   { kubectl "$@" 2>/dev/null; }
 etcdctl_pod() { kubectl -n kube-system exec etcd-cp1 -- "$@" 2>/dev/null; }
 
 # ══════════════════════════════════════════════════════════════════════════════
-dom ETCD 26 "🗄️  etcd Backup & Restore"
+dom ETCD 24 "🗄️  etcd Backup & Restore"
 
-# T1 — etcd snapshot saved and valid (14)
+# T1 — etcd snapshot saved and valid (12)
 d=ETCD
 if sudo test -f /var/lib/etcd/etcd-backup.db && etcdctl_pod etcdutl snapshot status /var/lib/etcd/etcd-backup.db >/dev/null 2>&1; then
-  pass 14 "T1 etcd backup — /var/lib/etcd/etcd-backup.db is a valid snapshot" $d
+  pass 12 "T1 etcd backup — /var/lib/etcd/etcd-backup.db is a valid snapshot" $d
 else
   ex=$(sudo test -f /var/lib/etcd/etcd-backup.db && echo yes || echo no)
-  fail 14 "T1 etcd backup — save a valid etcd snapshot to /var/lib/etcd/etcd-backup.db" $d "file present=${ex}, etcdutl snapshot status failed or file missing"
+  fail 12 "T1 etcd backup — save a valid etcd snapshot to /var/lib/etcd/etcd-backup.db" $d "file present=${ex}, etcdutl snapshot status failed or file missing"
 fi
 
 # T2 — snapshot restored into an alternate data-dir (12)
@@ -36,9 +36,9 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
-dom CERTS 24 "🔐 Certificates & CSR"
+dom CERTS 22 "🔐 Certificates & CSR"
 
-# T3 — CSR 'applicant' approved and issued (12)
+# T3 — CSR 'applicant' approved and issued (10)
 # K8s garbage-collects APPROVED CSRs after ~1 h → the exported certificate file
 # is accepted as durable evidence when the CSR object is already gone.
 d=CERTS
@@ -51,9 +51,9 @@ if sudo test -f /opt/cka/applicant.crt \
   file_ok=yes
 fi
 if { [ "$appr" = "True" ] && [ -n "$cert" ]; } || [ "$file_ok" = "yes" ]; then
-  pass 12 "T3 CSR — 'applicant' approved and certificate issued" $d
+  pass 10 "T3 CSR — 'applicant' approved and certificate issued" $d
 else
-  fail 12 "T3 CSR — approve the pending CSR 'applicant' and save the issued cert to /opt/cka/applicant.crt" $d "Approved=${appr:-∅}, certificate=$([ -n "$cert" ] && echo issued || echo empty), /opt/cka/applicant.crt=${file_ok} (note: approved CSRs are GC'd after ~1 h)"
+  fail 10 "T3 CSR — approve the pending CSR 'applicant' and save the issued cert to /opt/cka/applicant.crt" $d "Approved=${appr:-∅}, certificate=$([ -n "$cert" ] && echo issued || echo empty), /opt/cka/applicant.crt=${file_ok} (note: approved CSRs are GC'd after ~1 h)"
 fi
 
 # T6 — kube-apiserver certificate expiration written to the report file (12)
@@ -67,19 +67,19 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
-dom RBAC 26 "👤 RBAC & Authorization"
+dom RBAC 34 "👤 RBAC & Authorization"
 
-# T4 — cluster-wide read-only ClusterRole bound to group 'viewers' (14)
+# T4 — cluster-wide read-only ClusterRole bound to group 'viewers' (12)
 d=RBAC
 cl=$(jp auth can-i list pods --all-namespaces --as=tester --as-group=viewers)
 cd_=$(jp auth can-i delete pods --all-namespaces --as=tester --as-group=viewers)
 if [ "$cl" = "yes" ] && [ "$cd_" = "no" ]; then
-  pass 14 "T4 RBAC — group 'viewers' can list pods cluster-wide but not delete" $d
+  pass 12 "T4 RBAC — group 'viewers' can list pods cluster-wide but not delete" $d
 else
   r=""
   [ "$cl" = "yes" ] || r+="cannot 'list' pods cluster-wide; "
   [ "$cd_" = "no" ] || r+="can 'delete' pods (too permissive); "
-  fail 14 "T4 RBAC — bind ClusterRole 'pod-viewer' (get/list/watch pods) to group 'viewers'" $d "${r%; }"
+  fail 12 "T4 RBAC — bind ClusterRole 'pod-viewer' (get/list/watch pods) to group 'viewers'" $d "${r%; }"
 fi
 
 # T5 — namespaced Role for user 'auditor' in ns 'finance' (12)
@@ -95,29 +95,48 @@ else
   fail 12 "T5 RBAC — grant user 'auditor' configmap management in ns 'finance' (namespaced)" $d "${r%; }"
 fi
 
-# ══════════════════════════════════════════════════════════════════════════════
-dom NODES 24 "🖥️  Nodes & Static Pods"
+# T9 — ServiceAccount token exported (10)
+# JWT payload is decoded offline: the token stays verifiable even after it expires.
+d=RBAC
+sa9=$(jp -n finance get sa robot -o name)
+tok_ok=no
+if sudo test -f /opt/cka/robot-token.txt; then
+  tok=$(sudo tr -d ' \r\n' < /opt/cka/robot-token.txt)
+  payload=$(printf '%s' "$tok" | cut -d. -f2 | tr '_-' '/+')
+  case $(( ${#payload} % 4 )) in 2) payload="$payload==";; 3) payload="$payload=";; esac
+  if printf '%s' "$payload" | base64 -d 2>/dev/null | grep -q '"sub":"system:serviceaccount:finance:robot"'; then
+    tok_ok=yes
+  fi
+fi
+if [ -n "$sa9" ] && [ "$tok_ok" = "yes" ]; then
+  pass 10 "T9 token — SA finance/robot exists, valid token exported" $d
+else
+  fail 10 "T9 token — create SA 'robot' in ns finance and write its token to /opt/cka/robot-token.txt" $d "SA=$([ -n "$sa9" ] && echo present || echo missing), token file=$(sudo test -f /opt/cka/robot-token.txt && echo "present but sub≠finance/robot or not a JWT" || echo missing)"
+fi
 
-# T7 — node w1 drained for maintenance (12)
+# ══════════════════════════════════════════════════════════════════════════════
+dom NODES 20 "🖥️  Nodes & Static Pods"
+
+# T7 — node w1 drained for maintenance (10)
 d=NODES
 u1=$(jp get node w1 -o jsonpath='{.spec.unschedulable}')
 onw1=$(jp -n legacy get pods --field-selector spec.nodeName=w1 --no-headers 2>/dev/null | grep -c .)
 if [ "$u1" = "true" ] && [ "${onw1:-0}" -eq 0 ]; then
-  pass 12 "T7 drain — w1 cordoned and 'legacy-app' evicted" $d
+  pass 10 "T7 drain — w1 cordoned and 'legacy-app' evicted" $d
 else
-  fail 12 "T7 drain — drain node w1 (cordon + evict workloads) for maintenance" $d "w1 unschedulable=${u1:-false}, legacy-app pods still on w1=${onw1:-?}"
+  fail 10 "T7 drain — drain node w1 (cordon + evict workloads) for maintenance" $d "w1 unschedulable=${u1:-false}, legacy-app pods still on w1=${onw1:-?}"
 fi
 
-# T8 — static pod on cp1 (12)
+# T8 — static pod on cp1 (10)
 d=NODES
 # -n default: do not depend on the user's current kubeconfig context namespace
 phase=$(jp get pod web-static-cp1 -n default -o jsonpath='{.status.phase}')
 owner=$(jp get pod web-static-cp1 -n default -o jsonpath='{.metadata.ownerReferences[0].kind}')
 img=$(jp get pod web-static-cp1 -n default -o jsonpath='{.spec.containers[0].image}')
 if [ "$phase" = "Running" ] && [ "$owner" = "Node" ] && printf '%s' "$img" | grep -q 'nginx:1.29-alpine'; then
-  pass 12 "T8 static pod — 'web-static-cp1' Running (managed by kubelet)" $d
+  pass 10 "T8 static pod — 'web-static-cp1' Running (managed by kubelet)" $d
 else
-  fail 12 "T8 static pod — create a static pod 'web-static' on cp1 (nginx:1.29-alpine)" $d "phase=${phase:-absent}, owner=${owner:-?}, image=${img:-∅} (expected Running/Node/nginx:1.29-alpine)"
+  fail 10 "T8 static pod — create a static pod 'web-static' on cp1 (nginx:1.29-alpine)" $d "phase=${phase:-absent}, owner=${owner:-?}, image=${img:-∅} (expected Running/Node/nginx:1.29-alpine)"
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════

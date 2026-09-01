@@ -12,7 +12,7 @@ set -uo pipefail
 bash /vagrant/check-cluster-health.sh || exit 1
 
 GOOD_IMG="nginx:1.29-alpine"
-NSES="w-deploy w-ds w-batch w-hpa w-res w-sched w-taint w-spread w-prio"
+NSES="w-deploy w-roll w-ds w-batch w-hpa w-res w-sched w-taint w-spread w-prio"
 
 echo "🧹 Cleaning up previous state (idempotent)…"
 # Scheduling side-effects a previous solution may have left on the nodes.
@@ -57,7 +57,7 @@ spec:
 EOF
 
 echo ""
-echo "✅ Workloads & Scheduling lab ready — build the 12 objects, then grade yourself."
+echo "✅ Workloads & Scheduling lab ready — build the 13 objects, then grade yourself."
 echo "   • Tasks   : lab-setup/labs/lab-workloads-scheduling/LAB.md"
 echo "   • Grade   : bash /vagrant/labs/lab-workloads-scheduling/grade.sh"
 echo "   • Nodes   :"

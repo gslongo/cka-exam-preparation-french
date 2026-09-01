@@ -101,6 +101,19 @@ kubectl auth can-i create configmaps -n default --as=auditor    # no
 **Key points**: a `Role` + `RoleBinding` are **namespaced** — the grant applies only inside
 `finance`. Using a `ClusterRoleBinding` here would wrongly grant it everywhere.
 
+### T9 — ServiceAccount token exported to a file
+```bash
+kubectl -n finance create serviceaccount robot
+kubectl -n finance create token robot > /opt/cka/robot-token.txt
+cat /opt/cka/robot-token.txt        # single line, starts with eyJ
+```
+**Key points**: since **1.24**, ServiceAccounts get **no** auto-created Secret token —
+`kubectl create token` issues a short-lived **JWT** on demand (default ~1 h; `--duration=2h`
+to extend). The token's payload carries `sub: system:serviceaccount:finance:robot` — that's
+what the grader decodes, so an *expired* token still passes. Legacy alternative (long-lived):
+create a Secret of type `kubernetes.io/service-account-token` with the
+`kubernetes.io/service-account.name` annotation.
+
 ---
 
 ## 🖥️ Nodes & Static Pods

@@ -25,13 +25,31 @@ kubectl -n w-deploy get deploy rollout-app -o jsonpath='{.spec.strategy.rollingU
 **Key points**: `maxSurge=2` lets 2 extra pods spin up during an update; `maxUnavailable=0`
 guarantees no capacity loss — a zero-downtime rollout.
 
+### T3 — Rolling update & rollback (ns `w-roll`)
+```bash
+kubectl -n w-roll create deployment rollver --image=nginx:1.29-alpine --replicas=2
+kubectl -n w-roll rollout status deploy/rollver
+
+kubectl -n w-roll set image deploy/rollver nginx=nginx:1.29     # container is named 'nginx'
+kubectl -n w-roll rollout status deploy/rollver
+
+kubectl -n w-roll rollout undo deploy/rollver
+kubectl -n w-roll rollout status deploy/rollver
+
+kubectl -n w-roll rollout history deploy/rollver                # ≥ 3 revisions
+kubectl -n w-roll get deploy rollver -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'   # nginx:1.29-alpine
+```
+**Key points**: `rollout undo` re-applies the previous template as a **new** revision
+(create=1, update=2, undo=3). `kubectl create deploy` names the container after the image
+basename (`nginx`) — needed for `set image`.
+
 ---
 
 ## ⏱️ DaemonSets, Jobs & CronJobs
 
-### T3 — DaemonSet on every node incl. cp1 and a tainted w1 (ns `w-ds`)
+### T4 — DaemonSet on every node incl. cp1 and a tainted w1 (ns `w-ds`)
 A DaemonSet only lands on a node whose taints it **tolerates**. To cover the control-plane
-node *and* w1 (tainted in T10), tolerate **all** taints with `operator: Exists`.
+node *and* w1 (tainted in T11), tolerate **all** taints with `operator: Exists`.
 ```bash
 kubectl apply -f - <<'EOF'
 apiVersion: apps/v1
@@ -51,7 +69,7 @@ EOF
 kubectl -n w-ds get ds node-agent    # DESIRED 3  READY 3
 ```
 
-### T4 — Job with 3 completions (ns `w-batch`)
+### T5 — Job with 3 completions (ns `w-batch`)
 ```bash
 kubectl apply -f - <<'EOF'
 apiVersion: batch/v1
@@ -70,7 +88,7 @@ EOF
 kubectl -n w-batch get job pi        # COMPLETIONS 3/3
 ```
 
-### T5 — CronJob every minute (ns `w-batch`)
+### T6 — CronJob every minute (ns `w-batch`)
 ```bash
 kubectl -n w-batch create cronjob report \
   --image=busybox:1.36 --schedule="*/1 * * * *" -- sh -c "date"
@@ -81,7 +99,7 @@ kubectl -n w-batch get cronjob report
 
 ## 📈 Autoscaling & QoS
 
-### T6 — HorizontalPodAutoscaler (ns `w-hpa`)
+### T7 — HorizontalPodAutoscaler (ns `w-hpa`)
 The Deployment `hpa-target` already exists (with CPU **requests** — mandatory for CPU HPA).
 ```bash
 kubectl -n w-hpa autoscale deployment hpa-target --cpu=50% --min=1 --max=5
@@ -91,7 +109,7 @@ kubectl -n w-hpa get hpa hpa-target
 **Key points**: the HPA gets the deployment's name (`hpa-target`). Without CPU `requests`
 on the pods, the autoscaler cannot compute a utilisation percentage.
 
-### T7 — Guaranteed QoS pod (ns `w-res`)
+### T8 — Guaranteed QoS pod (ns `w-res`)
 QoS is **Guaranteed** only when every container sets CPU **and** memory `requests` **equal**
 to its `limits`.
 ```bash
@@ -114,7 +132,7 @@ kubectl -n w-res get pod guaranteed -o jsonpath='{.status.qosClass}{"\n"}'   # G
 
 ## 🎯 Scheduling & Placement
 
-### T8 — nodeSelector onto w2 (ns `w-sched`)
+### T9 — nodeSelector onto w2 (ns `w-sched`)
 ```bash
 kubectl label node w2 disktype=ssd
 kubectl apply -f - <<'EOF'
@@ -130,7 +148,7 @@ EOF
 kubectl -n w-sched get pod ssd-pod -o wide     # NODE w2
 ```
 
-### T9 — nodeAffinity onto w2 (ns `w-sched`)
+### T10 — nodeAffinity onto w2 (ns `w-sched`)
 ```bash
 kubectl apply -f - <<'EOF'
 apiVersion: v1
@@ -154,7 +172,7 @@ kubectl -n w-sched get pod affinity-pod -o wide   # NODE w2
 **Key points**: `nodeAffinity` is the expressive successor to `nodeSelector` (operators
 `In`, `NotIn`, `Exists`…). `required…` is a hard constraint (like nodeSelector).
 
-### T10 — Taint w1, run a tolerating pod there (ns `w-taint`)
+### T11 — Taint w1, run a tolerating pod there (ns `w-taint`)
 ```bash
 kubectl taint node w1 dedicated=batch:NoSchedule
 kubectl apply -f - <<'EOF'
@@ -178,7 +196,7 @@ The pod schedules on w1 only because it *both* tolerates the taint and targets w
 (Setting `nodeName` would bypass the scheduler and the taint entirely — that would not
 demonstrate the toleration.)
 
-### T11 — topologySpreadConstraints (ns `w-spread`)
+### T12 — topologySpreadConstraints (ns `w-spread`)
 ```bash
 kubectl apply -f - <<'EOF'
 apiVersion: apps/v1
@@ -204,7 +222,7 @@ EOF
 a *soft* preference (pods still schedule even if the spread can't be honoured — important
 here since w1 is tainted). `DoNotSchedule` would make it a hard rule.
 
-### T12 — PriorityClass + critical pod (ns `w-prio`)
+### T13 — PriorityClass + critical pod (ns `w-prio`)
 ```bash
 kubectl apply -f - <<'EOF'
 apiVersion: scheduling.k8s.io/v1

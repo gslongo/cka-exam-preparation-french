@@ -95,7 +95,7 @@ sudo mkdir -p "$REPORT_DIR" && sudo chmod 1777 "$REPORT_DIR"
 rm -f /tmp/applicant.key /tmp/applicant.csr 2>/dev/null || true
 
 echo ""
-echo "✅ Cluster-maintenance lab ready — perform the 8 tasks, then grade yourself."
+echo "✅ Cluster-maintenance lab ready — perform the 9 tasks, then grade yourself."
 echo "   • Tasks   : lab-setup/labs/lab-cluster-maintenance/LAB.md"
 echo "   • Grade   : bash /vagrant/labs/lab-cluster-maintenance/grade.sh"
 echo "   • Nodes   :"
