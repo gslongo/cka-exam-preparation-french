@@ -34,8 +34,10 @@ In namespace **`w-deploy`**, create a Deployment **`frontend`** using **`nginx:1
 and **scale it to 3** replicas (all Ready).
 
 ### Task 2 — Rollout strategy (8 pts)
-In namespace **`w-deploy`**, create a Deployment **`rollout-app`** whose update strategy is
-**RollingUpdate** with **`maxSurge: 2`** and **`maxUnavailable: 0`** (a zero-downtime rollout).
+In namespace **`w-deploy`**, create a Deployment **`rollout-app`** (`nginx:1.29-alpine`,
+replica count of your choice) whose update strategy is **RollingUpdate** with
+**`maxSurge: 2`** and **`maxUnavailable: 0`** (a zero-downtime rollout).
+*Graded on the strategy only.*
 
 ---
 
@@ -75,28 +77,30 @@ is **Guaranteed**.
 ## 🎯 Scheduling & Placement (43 pts)
 
 ### Task 8 — nodeSelector (8 pts)
-Label node **w2** with **`disktype=ssd`**, then create a pod **`ssd-pod`** in namespace
-**`w-sched`** that uses a **nodeSelector** to run **on w2**.
+Label node **w2** with **`disktype=ssd`**, then create a pod **`ssd-pod`** (`nginx:1.29-alpine`)
+in namespace **`w-sched`** that uses a **nodeSelector** to run **on w2**.
 
 ### Task 9 — nodeAffinity (8 pts)
-In namespace **`w-sched`**, create a pod **`affinity-pod`** that uses **required
-`nodeAffinity`** on `kubernetes.io/hostname` to run **on w2**.
+In namespace **`w-sched`**, create a pod **`affinity-pod`** (`nginx:1.29-alpine`) that uses
+**required `nodeAffinity`** on `kubernetes.io/hostname` to run **on w2**.
 
 ### Task 10 — Taint & toleration (9 pts)
 **Taint** node **w1** with **`dedicated=batch:NoSchedule`**, then create a pod **`batch-pod`**
-in namespace **`w-taint`** that **tolerates** this taint and actually **runs on w1**.
+(`nginx:1.29-alpine`) in namespace **`w-taint`** that **tolerates** this taint and actually
+**runs on w1**.
 
 > 💡 The pod must both *tolerate* the taint and *target* w1. Do not use `nodeName` — that
 > bypasses the scheduler (and the taint) and would defeat the exercise.
 
 ### Task 11 — Topology spread (9 pts)
-In namespace **`w-spread`**, create a Deployment **`spread-app`** whose pod template has a
-**topologySpreadConstraint**: `maxSkew: 1`, `topologyKey: kubernetes.io/hostname`,
-`whenUnsatisfiable: ScheduleAnyway`. *Graded on the spec.*
+In namespace **`w-spread`**, create a Deployment **`spread-app`** (`nginx:1.29-alpine`,
+replica count of your choice) whose pod template has a **topologySpreadConstraint**:
+`maxSkew: 1`, `topologyKey: kubernetes.io/hostname`, `whenUnsatisfiable: ScheduleAnyway`.
+*Graded on the spec only.*
 
 ### Task 12 — PriorityClass (9 pts)
 Create a **PriorityClass `high-priority`** with value **`1000000`**, then run a pod
-**`critical`** in namespace **`w-prio`** that uses it (and is **Running**).
+**`critical`** (`nginx:1.29-alpine`) in namespace **`w-prio`** that uses it (and is **Running**).
 
 ---
 
