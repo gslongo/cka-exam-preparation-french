@@ -53,7 +53,7 @@ client certificate is issued (its `.status.certificate` becomes populated), then
 > ⚠️ Kubernetes **garbage-collects approved CSRs after ~1 h** — the saved file is your
 > durable proof for the grader (and a classic exam move: extracting an issued cert).
 
-### Task 6 — Report a certificate's expiry (12 pts)
+### Task 4 — Report a certificate's expiry (12 pts)
 Find the expiration date of the **kube-apiserver** certificate and write **that date**
 (exactly as reported by `kubeadm`) into the file **`/opt/cka/apiserver-expiration.txt`**.
 
@@ -63,19 +63,19 @@ Find the expiration date of the **kube-apiserver** certificate and write **that 
 
 ## 👤 RBAC & Authorization (34 pts)
 
-### Task 4 — Cluster-wide read-only access (12 pts)
+### Task 5 — Cluster-wide read-only access (12 pts)
 Create a **ClusterRole** named **`pod-viewer`** allowing `get`, `list`, `watch` on **pods**,
 and bind it (**ClusterRoleBinding** `pod-viewer-binding`) to the **group `viewers`**.
 Members of `viewers` must be able to list pods in **every** namespace, but **not delete** them.
 
 > 💡 Verify with `kubectl auth can-i … --as=<user> --as-group=viewers`.
 
-### Task 5 — Namespaced configmap management (12 pts)
+### Task 6 — Namespaced configmap management (12 pts)
 In namespace **`finance`**, grant the user **`auditor`** the ability to manage **ConfigMaps**
 (`get`, `list`, `create`, `update`). The grant must apply **only** in `finance` — `auditor`
 must **not** be able to create ConfigMaps in any other namespace.
 
-### Task 9 — ServiceAccount token (10 pts)
+### Task 7 — ServiceAccount token (10 pts)
 In namespace **`finance`**, create a ServiceAccount **`robot`**, then write **a token** for it
 to **`/opt/cka/robot-token.txt`**. The file must contain **only the token value** (a single
 `eyJ…` line, nothing else).
@@ -88,14 +88,14 @@ to **`/opt/cka/robot-token.txt`**. The file must contain **only the token value*
 
 ## 🖥️ Nodes & Static Pods (20 pts)
 
-### Task 7 — Drain a node for maintenance (10 pts)
+### Task 8 — Drain a node for maintenance (10 pts)
 Node **`w1`** must be taken out of service for maintenance: **cordon it and evict its
 workloads** (a Deployment `legacy-app` is currently running there). Afterwards `w1` must be
 `SchedulingDisabled` and carry no `legacy-app` pods.
 
 > 💡 DaemonSet pods are expected to remain — the standard drain flags handle them.
 
-### Task 8 — Run a static pod (10 pts)
+### Task 9 — Run a static pod (10 pts)
 Create a **static pod** named **`web-static`** on **cp1** using image **`nginx:1.29-alpine`**
 (container port 80), in the **`default`** namespace. It must end up **Running** and be managed
 by the kubelet (not the API).

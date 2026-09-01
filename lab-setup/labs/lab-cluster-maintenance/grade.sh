@@ -56,46 +56,46 @@ else
   fail 10 "T3 CSR — approve the pending CSR 'applicant' and save the issued cert to /opt/cka/applicant.crt" $d "Approved=${appr:-∅}, certificate=$([ -n "$cert" ] && echo issued || echo empty), /opt/cka/applicant.crt=${file_ok} (note: approved CSRs are GC'd after ~1 h)"
 fi
 
-# T6 — kube-apiserver certificate expiration written to the report file (12)
+# T4 — kube-apiserver certificate expiration written to the report file (12)
 d=CERTS
 exp=$(sudo kubeadm certs check-expiration 2>/dev/null | awk '/^apiserver /{print $2, $3, $4; exit}')
 if [ -f /opt/cka/apiserver-expiration.txt ] && [ -n "$exp" ] && grep -qF "$exp" /opt/cka/apiserver-expiration.txt 2>/dev/null; then
-  pass 12 "T6 cert expiry — apiserver expiration date reported correctly" $d
+  pass 12 "T4 cert expiry — apiserver expiration date reported correctly" $d
 else
   got=$( [ -f /opt/cka/apiserver-expiration.txt ] && tr -d '\n' < /opt/cka/apiserver-expiration.txt | cut -c1-40 || echo "file missing")
-  fail 12 "T6 cert expiry — write the kube-apiserver cert expiration date to /opt/cka/apiserver-expiration.txt" $d "expected to contain '${exp:-?}', got: ${got}"
+  fail 12 "T4 cert expiry — write the kube-apiserver cert expiration date to /opt/cka/apiserver-expiration.txt" $d "expected to contain '${exp:-?}', got: ${got}"
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
 dom RBAC 34 "👤 RBAC & Authorization"
 
-# T4 — cluster-wide read-only ClusterRole bound to group 'viewers' (12)
+# T5 — cluster-wide read-only ClusterRole bound to group 'viewers' (12)
 d=RBAC
 cl=$(jp auth can-i list pods --all-namespaces --as=tester --as-group=viewers)
 cd_=$(jp auth can-i delete pods --all-namespaces --as=tester --as-group=viewers)
 if [ "$cl" = "yes" ] && [ "$cd_" = "no" ]; then
-  pass 12 "T4 RBAC — group 'viewers' can list pods cluster-wide but not delete" $d
+  pass 12 "T5 RBAC — group 'viewers' can list pods cluster-wide but not delete" $d
 else
   r=""
   [ "$cl" = "yes" ] || r+="cannot 'list' pods cluster-wide; "
   [ "$cd_" = "no" ] || r+="can 'delete' pods (too permissive); "
-  fail 12 "T4 RBAC — bind ClusterRole 'pod-viewer' (get/list/watch pods) to group 'viewers'" $d "${r%; }"
+  fail 12 "T5 RBAC — bind ClusterRole 'pod-viewer' (get/list/watch pods) to group 'viewers'" $d "${r%; }"
 fi
 
-# T5 — namespaced Role for user 'auditor' in ns 'finance' (12)
+# T6 — namespaced Role for user 'auditor' in ns 'finance' (12)
 d=RBAC
 cf=$(jp auth can-i create configmaps -n finance --as=auditor)
 cx=$(jp auth can-i create configmaps -n default --as=auditor)
 if [ "$cf" = "yes" ] && [ "$cx" = "no" ]; then
-  pass 12 "T5 RBAC — user 'auditor' can manage configmaps in 'finance' only" $d
+  pass 12 "T6 RBAC — user 'auditor' can manage configmaps in 'finance' only" $d
 else
   r=""
   [ "$cf" = "yes" ] || r+="cannot create configmaps in 'finance'; "
   [ "$cx" = "no" ]  || r+="can create configmaps outside 'finance' (Role too wide / ClusterRoleBinding?); "
-  fail 12 "T5 RBAC — grant user 'auditor' configmap management in ns 'finance' (namespaced)" $d "${r%; }"
+  fail 12 "T6 RBAC — grant user 'auditor' configmap management in ns 'finance' (namespaced)" $d "${r%; }"
 fi
 
-# T9 — ServiceAccount token exported (10)
+# T7 — ServiceAccount token exported (10)
 # JWT payload is decoded offline: the token stays verifiable even after it expires.
 d=RBAC
 sa9=$(jp -n finance get sa robot -o name)
@@ -109,34 +109,34 @@ if sudo test -f /opt/cka/robot-token.txt; then
   fi
 fi
 if [ -n "$sa9" ] && [ "$tok_ok" = "yes" ]; then
-  pass 10 "T9 token — SA finance/robot exists, valid token exported" $d
+  pass 10 "T7 token — SA finance/robot exists, valid token exported" $d
 else
-  fail 10 "T9 token — create SA 'robot' in ns finance and write its token to /opt/cka/robot-token.txt" $d "SA=$([ -n "$sa9" ] && echo present || echo missing), token file=$(sudo test -f /opt/cka/robot-token.txt && echo "present but sub≠finance/robot or not a JWT" || echo missing)"
+  fail 10 "T7 token — create SA 'robot' in ns finance and write its token to /opt/cka/robot-token.txt" $d "SA=$([ -n "$sa9" ] && echo present || echo missing), token file=$(sudo test -f /opt/cka/robot-token.txt && echo "present but sub≠finance/robot or not a JWT" || echo missing)"
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
 dom NODES 20 "🖥️  Nodes & Static Pods"
 
-# T7 — node w1 drained for maintenance (10)
+# T8 — node w1 drained for maintenance (10)
 d=NODES
 u1=$(jp get node w1 -o jsonpath='{.spec.unschedulable}')
 onw1=$(jp -n legacy get pods --field-selector spec.nodeName=w1 --no-headers 2>/dev/null | grep -c .)
 if [ "$u1" = "true" ] && [ "${onw1:-0}" -eq 0 ]; then
-  pass 10 "T7 drain — w1 cordoned and 'legacy-app' evicted" $d
+  pass 10 "T8 drain — w1 cordoned and 'legacy-app' evicted" $d
 else
-  fail 10 "T7 drain — drain node w1 (cordon + evict workloads) for maintenance" $d "w1 unschedulable=${u1:-false}, legacy-app pods still on w1=${onw1:-?}"
+  fail 10 "T8 drain — drain node w1 (cordon + evict workloads) for maintenance" $d "w1 unschedulable=${u1:-false}, legacy-app pods still on w1=${onw1:-?}"
 fi
 
-# T8 — static pod on cp1 (10)
+# T9 — static pod on cp1 (10)
 d=NODES
 # -n default: do not depend on the user's current kubeconfig context namespace
 phase=$(jp get pod web-static-cp1 -n default -o jsonpath='{.status.phase}')
 owner=$(jp get pod web-static-cp1 -n default -o jsonpath='{.metadata.ownerReferences[0].kind}')
 img=$(jp get pod web-static-cp1 -n default -o jsonpath='{.spec.containers[0].image}')
 if [ "$phase" = "Running" ] && [ "$owner" = "Node" ] && printf '%s' "$img" | grep -q 'nginx:1.29-alpine'; then
-  pass 10 "T8 static pod — 'web-static-cp1' Running (managed by kubelet)" $d
+  pass 10 "T9 static pod — 'web-static-cp1' Running (managed by kubelet)" $d
 else
-  fail 10 "T8 static pod — create a static pod 'web-static' on cp1 (nginx:1.29-alpine)" $d "phase=${phase:-absent}, owner=${owner:-?}, image=${img:-∅} (expected Running/Node/nginx:1.29-alpine)"
+  fail 10 "T9 static pod — create a static pod 'web-static' on cp1 (nginx:1.29-alpine)" $d "phase=${phase:-absent}, owner=${owner:-?}, image=${img:-∅} (expected Running/Node/nginx:1.29-alpine)"
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════

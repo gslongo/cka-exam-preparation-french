@@ -60,7 +60,7 @@ is signed automatically **once approved** by the controller-manager. `.status.ce
 then holds the issued cert (base64 PEM). ⚠️ Approved CSRs are **garbage-collected after ~1 h**
 — export the certificate right away; the file is what the grader trusts long-term.
 
-### T6 — Report the kube-apiserver certificate expiration
+### T4 — Report the kube-apiserver certificate expiration
 ```bash
 sudo kubeadm certs check-expiration | grep -E '^apiserver '
 # e.g.  apiserver   Aug 28, 2027 09:48 UTC   364d   ca   no
@@ -74,7 +74,7 @@ reload) — not required here.
 
 ## 👤 RBAC & Authorization
 
-### T4 — Cluster-wide read-only for group `viewers`
+### T5 — Cluster-wide read-only for group `viewers`
 ```bash
 kubectl create clusterrole pod-viewer --verb=get,list,watch --resource=pods
 kubectl create clusterrolebinding pod-viewer-binding \
@@ -87,7 +87,7 @@ kubectl auth can-i delete pods --all-namespaces --as=tester --as-group=viewers  
 **Key points**: a `ClusterRole` + `ClusterRoleBinding` grants a permission across **all**
 namespaces. `auth can-i --as/--as-group` is the way to test authorization without real users.
 
-### T5 — Namespaced configmap management for user `auditor`
+### T6 — Namespaced configmap management for user `auditor`
 ```bash
 kubectl -n finance create role cm-manager \
   --verb=get,list,create,update --resource=configmaps
@@ -101,7 +101,7 @@ kubectl auth can-i create configmaps -n default --as=auditor    # no
 **Key points**: a `Role` + `RoleBinding` are **namespaced** — the grant applies only inside
 `finance`. Using a `ClusterRoleBinding` here would wrongly grant it everywhere.
 
-### T9 — ServiceAccount token exported to a file
+### T7 — ServiceAccount token exported to a file
 ```bash
 kubectl -n finance create serviceaccount robot
 kubectl -n finance create token robot > /opt/cka/robot-token.txt
@@ -118,7 +118,7 @@ create a Secret of type `kubernetes.io/service-account-token` with the
 
 ## 🖥️ Nodes & Static Pods
 
-### T7 — Drain node w1 for maintenance
+### T8 — Drain node w1 for maintenance
 ```bash
 kubectl drain w1 --ignore-daemonsets --delete-emptydir-data
 kubectl get node w1                       # STATUS: Ready,SchedulingDisabled
@@ -128,7 +128,7 @@ kubectl -n legacy get pods -o wide        # legacy-app pods no longer on w1
 `--ignore-daemonsets` is needed because DaemonSet pods are not evicted; `--delete-emptydir-data`
 allows evicting pods using `emptyDir`. After maintenance you would `kubectl uncordon w1`.
 
-### T8 — Create a static pod on cp1
+### T9 — Create a static pod on cp1
 A static pod is managed by the **kubelet**, from `/etc/kubernetes/manifests/`, not the API.
 
 ```bash
