@@ -136,7 +136,7 @@ vagrant ssh cp1 -c "bash /vagrant/labs/lab-workloads-scheduling/grade.sh"
 
 ## 📝 CKA mock exams
 
-The [mock-exam/](mock-exam/) folder contains the **self-graded** mock exams, one subfolder per paper: [exam-01/](mock-exam/exam-01/) (intermediate), [exam-02/](mock-exam/exam-02/) (**advanced**) — 16 tasks, 100 pts, 66 % threshold, ~2 h each — and [exam-03/](mock-exam/exam-03/) (**expert — killer.sh-style drills**). Overview, weighting and file list: see the [main README](../README.md). Below, the **how-to** on the lab (replace `exam-01` with the paper of your choice):
+The [mock-exam/](mock-exam/) folder contains the **self-graded** mock exams, one subfolder per paper: [exam-01/](mock-exam/exam-01/) (intermediate), [exam-02/](mock-exam/exam-02/) (**advanced**) — 16 tasks, 100 pts, 66 % threshold, ~2 h each — and [exam-03/](mock-exam/exam-03/) / [exam-04/](mock-exam/exam-04/) (**expert — killer.sh-style drills**, sessions 1 & 2). Overview, weighting and file list: see the [main README](../README.md). Below, the **how-to** on the lab (replace `exam-01` with the paper of your choice):
 
 ```bash
 # 1. Prepare the environment (on cp1, via the synced /vagrant folder)

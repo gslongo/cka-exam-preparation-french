@@ -11,7 +11,7 @@
 
 > 🏆 **Stratégie & Top 15** : [shared/exam-strategy.md](shared/exam-strategy.md) (méthode, timing, bookmarks, PSI)
 
-> 🎯 **Examens blancs auto-corrigés** : [exam-01](lab-setup/mock-exam/exam-01/EXAM.md) (intermédiaire) · [exam-02](lab-setup/mock-exam/exam-02/EXAM.md) (**avancé**) · [exam-03](lab-setup/mock-exam/exam-03/EXAM.md) (**expert — drills killer.sh**) — chrono + correction `grade.sh`
+> 🎯 **Examens blancs auto-corrigés** : [exam-01](lab-setup/mock-exam/exam-01/EXAM.md) (intermédiaire) · [exam-02](lab-setup/mock-exam/exam-02/EXAM.md) (**avancé**) · [exam-03](lab-setup/mock-exam/exam-03/EXAM.md) (**expert — drills killer.sh**) · [exam-04](lab-setup/mock-exam/exam-04/EXAM.md) (**expert — drills killer.sh, session 2**) — chrono + correction `grade.sh`
 
 > 🧪 **Labs thématiques auto-corrigés** : [Services · Ingress · Gateway API](lab-setup/labs/lab-services-ingress-gateway/LAB.md) · [Stockage · ConfigMap/Secrets · Sidecars](lab-setup/labs/lab-storage-config-multicontainer/LAB.md) · [🔧 Troubleshooting transverse](lab-setup/labs/lab-troubleshooting/LAB.md) · [🛠️ Cluster & etcd](lab-setup/labs/lab-cluster-maintenance/LAB.md) · [📦 Workloads & Scheduling](lab-setup/labs/lab-workloads-scheduling/LAB.md) — un sujet en profondeur (100 pts, seuil 75 %)
 
@@ -51,7 +51,7 @@ CKA/                              ← workspace (ce dossier)
     ├── install-common.sh
     ├── init-cp.sh
     ├── join-worker.sh
-    ├── mock-exam/                 ← examens blancs auto-corrigés (un dossier par sujet : exam-01/, exam-02/, exam-03/)
+    ├── mock-exam/                 ← examens blancs auto-corrigés (un dossier par sujet : exam-01/ … exam-04/)
     └── labs/                      ← labs thématiques ciblés (ex. lab-services-ingress-gateway/)
 ```
 
@@ -138,22 +138,24 @@ Tu connais l'admin. Il te reste la **vitesse**, le **format** et quelques **méc
 
 ## 🎯 Examens blancs CKA
 
-Trois examens blancs complets **auto-corrigés** tournent sur le [lab local](lab-setup/README.md). Chaque sujet vit dans son sous-dossier.
+Quatre examens blancs complets **auto-corrigés** tournent sur le [lab local](lab-setup/README.md). Chaque sujet vit dans son sous-dossier.
 
 - **exam-01** & **exam-02** — format « vrai CKA » : **16 tâches, 100 pts, seuil 66 %, ~2 h**, pondérés par domaine (Troubleshooting 30 % · Cluster Architecture 25 % · Réseau 20 % · Workloads 15 % · Storage 10 %).
-- **exam-03** — format « killer.sh » : **drills ciblés** qui comblent les sujets pointus rencontrés sur killer.sh (mapping ~1:1 avec ses questions), au-delà de ce que couvrent exam-01/02.
+- **exam-03** & **exam-04** — format « killer.sh » : **drills ciblés** qui comblent les sujets pointus rencontrés sur killer.sh (mapping ~1:1 avec les questions d'une session), au-delà de ce que couvrent exam-01/02.
 
 Détail des niveaux :
 
 - **exam-01** — niveau intermédiaire : RBAC namespacé, snapshot etcd, static pod, cordon, ConfigMap→env, NodePort, NetworkPolicy simple, PV/PVC…
 - **exam-02** — **niveau avancé** : RBAC *cluster-scoped*, scheduling manuel, taints/tolerations, Secret→env, NetworkPolicy *default-deny*, `reclaimPolicy`/`subPath`, troubleshooting moins évident (sonde, dérive de labels, contrainte de placement, Secret manquant).
 - **exam-03** — **niveau expert (drills killer.sh)** : extraction kubeconfig, Helm + cert-manager + ClusterIssuer, StatefulSet scale, QoS, **HPA + Kustomize**, PV/PVC monté par Deployment, `kubectl top`, upgrade worker + `kubeadm join`, API depuis un Pod, DaemonSet, anti-affinité multi-conteneurs, **Gateway API** (chemin + en-tête), `kubeadm certs renew`, **NetworkPolicy egress** (enforcement runtime), CoreDNS, `crictl`, introspection etcd, kube-proxy iptables, **Service CIDR** multi-range.
+- **exam-04** — **niveau expert (drills killer.sh, session 2)** : FQDN DNS (svc/headless/pod stable), static pod exposé en NodePort, **certificats kubelet** (client vs serving), readiness inter-Service, `--sort-by`, **kubelet cassé** (drop-in systemd, `203/EXEC`), etcd version+snapshot, typologie des composants du control plane, **scheduling manuel** (scheduler à l'arrêt, `nodeName`), **StorageClass** dynamique (`WaitForFirstConsumer`+`Retain`), Secrets volume+env, taints+`nodeSelector` control-plane, multi-conteneurs (emptyDir + Downward API), introspection cluster, events & `crictl`, `api-resources`, **Kustomize + RBAC d'opérateur** (CRDs).
 
 | Sujet | Fichiers |
 |---|---|
 | **exam-01** (intermédiaire) | [EXAM.md](lab-setup/mock-exam/exam-01/EXAM.md) · [solutions/SOLUTIONS.md](lab-setup/mock-exam/exam-01/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/mock-exam/exam-01/setup.sh) · [grade.sh](lab-setup/mock-exam/exam-01/grade.sh) |
 | **exam-02** (avancé) | [EXAM.md](lab-setup/mock-exam/exam-02/EXAM.md) · [solutions/SOLUTIONS.md](lab-setup/mock-exam/exam-02/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/mock-exam/exam-02/setup.sh) · [grade.sh](lab-setup/mock-exam/exam-02/grade.sh) |
 | **exam-03** (expert — killer.sh) | [EXAM.md](lab-setup/mock-exam/exam-03/EXAM.md) · [solutions/SOLUTIONS.md](lab-setup/mock-exam/exam-03/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/mock-exam/exam-03/setup.sh) · [grade.sh](lab-setup/mock-exam/exam-03/grade.sh) |
+| **exam-04** (expert — killer.sh, session 2) | [EXAM.md](lab-setup/mock-exam/exam-04/EXAM.md) · [solutions/SOLUTIONS.md](lab-setup/mock-exam/exam-04/solutions/SOLUTIONS.md) · [setup.sh](lab-setup/mock-exam/exam-04/setup.sh) · [grade.sh](lab-setup/mock-exam/exam-04/grade.sh) |
 
 Dans chaque sujet : `EXAM.md` = **questions seules** · `solutions/SOLUTIONS.md` = corrigé (à n'ouvrir **qu'après**) · `setup.sh` = amorce **idempotente** · `grade.sh` = correcteur **automatique** (score + verdict par domaine).
 
@@ -172,6 +174,7 @@ Dans chaque sujet : `EXAM.md` = **questions seules** · `solutions/SOLUTIONS.md`
 - [lab-setup/mock-exam/exam-01/EXAM.md](lab-setup/mock-exam/exam-01/EXAM.md) — examen blanc auto-corrigé, niveau intermédiaire (16 tâches, `setup.sh` + `grade.sh`)
 - [lab-setup/mock-exam/exam-02/EXAM.md](lab-setup/mock-exam/exam-02/EXAM.md) — examen blanc auto-corrigé, **niveau avancé** (RBAC cluster-scoped, taints, NetworkPolicy default-deny, `subPath`…)
 - [lab-setup/mock-exam/exam-03/EXAM.md](lab-setup/mock-exam/exam-03/EXAM.md) — examen blanc auto-corrigé, **niveau expert** — drills ciblés killer.sh (Helm/cert-manager, HPA+Kustomize, Gateway API, egress, `crictl`, ServiceCIDR…)
+- [lab-setup/mock-exam/exam-04/EXAM.md](lab-setup/mock-exam/exam-04/EXAM.md) — examen blanc auto-corrigé, **niveau expert** — drills killer.sh, session 2 (certificats kubelet, kubelet cassé, scheduling manuel, StorageClass dynamique, Kustomize+RBAC…)
 - [lab-setup/labs/lab-services-ingress-gateway/LAB.md](lab-setup/labs/lab-services-ingress-gateway/LAB.md) — **lab thématique** auto-corrigé : Services · Ingress · Gateway API (100 pts, objectif ≥ 75 %, `setup.sh` + `grade.sh`)
 - [lab-setup/labs/lab-storage-config-multicontainer/LAB.md](lab-setup/labs/lab-storage-config-multicontainer/LAB.md) — **lab thématique** auto-corrigé : Stockage · ConfigMap/Secrets · Sidecars (100 pts, objectif ≥ 75 %, `setup.sh` + `grade.sh`)
 - [lab-setup/labs/lab-troubleshooting/LAB.md](lab-setup/labs/lab-troubleshooting/LAB.md) — **lab thématique** auto-corrigé : 🔧 Troubleshooting transverse — 18 pannes tous domaines à diagnostiquer et réparer (100 pts, objectif ≥ 75 %, `setup.sh` + `grade.sh`)
