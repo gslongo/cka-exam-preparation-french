@@ -210,6 +210,8 @@ sudo etcdutl snapshot restore /var/backups/etcd.db \
 >
 > Il ne gère **que** les Pods qui lui sont assignés (ceux dont `nodeName` = son node) + les **static pods** de `/etc/kubernetes/manifests/`.
 >
+> 📌 **Mirror pods** : pour chaque static pod, le kubelet publie un **pod miroir** sur l'API — nom suffixé du node (`kube-apiserver-cp1`), `ownerReference` de kind **`Node`**, **lecture seule** : le supprimer via `kubectl` le fait juste réapparaître ; la seule vraie manœuvre est d'éditer/déplacer le **fichier manifest**. Un Service peut cibler un static pod via ses **labels**, comme n'importe quel Pod.
+>
 > 🔬 **Topology Manager** (culture) : composant interne du kubelet qui aligne l'allocation CPU / accélérateurs matériels sur la topologie **NUMA** du node, pour de meilleures perfs sur charges sensibles. Pas de tâche CKA dessus.
 
 ```mermaid
@@ -621,6 +623,10 @@ cgroupDriver: systemd     # doit correspondre au runtime (containerd)
 ### Certificats
 - Certs kubeadm **expirent après 1 an**. `kubeadm upgrade` les renouvelle automatiquement, sinon `kubeadm certs renew all` + restart kubelet.
 - Le cert du kubelet lui-même peut être auto-rotaté (`rotateCertificates: true` dans `KubeletConfiguration`).
+- **Les deux certificats du kubelet** (`/var/lib/kubelet/pki/`) — à ne pas confondre :
+  - `kubelet-client-current.pem` = cert **client** (kubelet → apiserver), émis par la **CA du cluster** (issuer `CN = kubernetes`) via le **TLS bootstrapping** (CSR API) ; c'est un **symlink**, ce qui permet la rotation. EKU = `TLS Web Client Authentication`.
+  - `kubelet.crt` = cert **serveur** (port 10250), par défaut **auto-signé** par une CA jetable propre au node (issuer `CN = <node>-ca@<timestamp>`) — c'est pourquoi l'apiserver ne le vérifie pas sans `--kubelet-certificate-authority` ; pour le faire signer par la CA cluster : `serverTLSBootstrap: true`. EKU = `TLS Web Server Authentication`.
+  - Inspection : `sudo openssl x509 -in <fichier> -noout -issuer -ext extendedKeyUsage`.
 - **Aucun registre des certs émis via l'API CSR** : les CSR **approuvés sont garbage-collectés après ~1 h**, et K8s ne journalise pas les signatures de la CA → le cert devient **irrécupérable côté cluster**. Réflexe : **exporter immédiatement** après approbation (`kubectl get csr <name> -o jsonpath='{.status.certificate}' | base64 -d > cert.crt`). Les seuls inventaires consultables : les CSR encore présents (`kubectl get csr`), les certs kubeadm sur disque (`/etc/kubernetes/pki/` + `kubeadm certs check-expiration`) et ceux du kubelet (`/var/lib/kubelet/pki/`).
 
 ### etcd

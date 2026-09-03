@@ -166,6 +166,7 @@ kubectl debug -it <pod> --image=nicolaka/netshoot --target=<container> -- ss -lt
 - Deployment dans `kube-system` avec service `kube-dns` (ClusterIP)
 - Résout : `<svc>.<ns>.svc.cluster.local` (A/AAAA) et `<pod-ip>.<ns>.pod.cluster.local`
 - StatefulSet Pod : `<pod>.<svc-headless>.<ns>.svc.cluster.local`
+- **Nom DNS stable pour un Pod « nu »** : `hostname: <h>` + `subdomain: <svc>` dans la spec (avec un Service **headless** nommé `<svc>` dans le même ns) → `<h>.<svc>.<ns>.svc.cluster.local`, **indépendant de l'IP** (la forme `<pod-ip-tirets>…` casse à chaque changement d'IP). C'est le mécanisme qu'un StatefulSet applique automatiquement.
 - Config : ConfigMap `coredns` (Corefile)
 
 ```

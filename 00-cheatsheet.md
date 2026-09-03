@@ -59,6 +59,7 @@ sudo chown $(id -u):$(id -g) $HOME/.kube/config
 | `k auth can-i <verb> <res> --as=<user>` | Test RBAC pour un **user** |
 | `k auth can-i <verb> <res> --as=system:serviceaccount:<ns>:<sa>` | Test RBAC pour un **ServiceAccount** (préfixe obligatoire) |
 | `k get ev --sort-by=.lastTimestamp` | Events triés |
+| `k get po -A --sort-by=.metadata.creationTimestamp` | Pods triés (marche aussi avec `.metadata.uid`, `.status.startTime`) |
 | `k debug node/n1 -it --image=busybox` | Ephemeral debug node |
 | `k debug pod/p -it --image=busybox --target=c` | Ephemeral debug container |
 
@@ -85,6 +86,9 @@ sudo chown $(id -u):$(id -g) $HOME/.kube/config
 sudo crictl ps -a | grep apiserver     # trouver le conteneur (même arrêté/crashé)
 sudo crictl logs <container-id>         # LIRE l'erreur (flag/cert/port erroné)
 sudo crictl inspect <container-id>      # détails complets si besoin
+sudo crictl exec -it <container-id> sh  # shell dans un conteneur qui tourne
+sudo crictl rm -f <container-id>        # kill → le kubelet relance (même Pod, restartCount+1)
+sudo crictl images                      # images locales (crictl pull <img> pour pré-charger)
 # → corriger /etc/kubernetes/manifests/kube-apiserver.yaml ; kubelet recrée le Pod (~30 s)
 ```
 - `crictl ps` = conteneurs actifs · `ps -a` = + arrêtés · `crictl pods` = sandboxes

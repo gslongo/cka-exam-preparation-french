@@ -4,7 +4,7 @@
 > Compilation des erreurs qui **coûtent des points** : pièges techniques, réflexes oubliés, et retours récurrents de candidats (forums, killer.sh, Reddit r/kubernetes, blogs de certifiés).
 > ⚠️ Basé sur des retours communautaires + curriculum v1.35. Les détails de l'interface évoluent — revérifie les règles officielles le jour J.
 
-_Dernière mise à jour : 2026-07-31_
+_Dernière mise à jour : 2026-09-03_
 
 ---
 
@@ -83,6 +83,7 @@ _Dernière mise à jour : 2026-07-31_
 | S3 | Ne pas **vérifier** les droits | `kubectl auth can-i <verb> <res> --as=<user>` (ou `--as=system:serviceaccount:...`). |
 | S4 | Oublier que le verbe/ressource est **pluriel/exact** | `--resource=pods` (pas `pod`), verbes : `get,list,watch,create,update,patch,delete`. |
 | S5 | CSR : oublier d'**approuver** | CSR = demande de certif **client** (ex. accès d'un user à l'API/kubectl via `signerName: kubernetes.io/kube-apiserver-client`, `usages: [client auth]`). `kubectl certificate approve <csr>` sinon **le CSR** reste `Pending` (`.status.certificate` vide) → cert jamais émis, kubeconfig inutilisable. ⚠️ Le cert **authentifie** (CN=user, O=groupe) mais n'**autorise** rien → il faut encore un RoleBinding/ClusterRoleBinding. |
+| S6 | RBAC sur des **Custom Resources** : mauvais `apiGroups` | Dans le Role : `apiGroups` = le **groupe du CR** (ex. `education.cka.local`, visible dans `apiVersion` du CR) et `resources` = le **pluriel du CRD** (`students`). Mettre `apiextensions.k8s.io` est un contresens : ce groupe-là gère les **CRD eux-mêmes** (les définir), pas leurs instances. Vérifie : `kubectl auth can-i list students.education.cka.local --as=system:serviceaccount:<ns>:<sa>`. |
 
 ---
 
@@ -105,6 +106,8 @@ _Dernière mise à jour : 2026-07-31_
 | W13 | `imagePullPolicy` par défaut dépend du **tag** | Tag fixe (`nginx:1.25`) → `IfNotPresent`. Tag `:latest` ou **absent** → `Always` (re-pull à chaque fois). Surprise en debug d'image cachée. |
 | W14 | `--from-file` vs `--from-env-file` pour ConfigMap/Secret | `--from-file=f` = **1 clé = nom du fichier**, valeur = tout le contenu. `--from-env-file=f` = **1 clé par ligne** `KEY=val`. Se tromper crée une structure inexploitable par `configMapKeyRef`. |
 | W15 | `envFrom` sur un ConfigMap/Secret dont des clés ne sont pas des noms de variables valides | Clés avec `.`/`-` (ex `car.make`) = **invalides** comme env vars → K8s les **skippe silencieusement** (event `InvalidVariableNames`), le Pod démarre quand même sans elles. En **volume** ces mêmes clés passent (noms de fichiers OK). Vérifier avec `kubectl describe pod`. |
+| W16 | Modifier un ConfigMap/Secret et croire que les Pods **voient** le changement | Les valeurs injectées en **env** (`envFrom`/`valueFrom`) sont **figées au démarrage du conteneur** — elles ne se rafraîchissent **jamais** en place. Après édition du CM/Secret → `kubectl rollout restart deploy/<x>` fait **partie de la réponse**. (En **volume**, les clés se mettent à jour toutes seules, avec un délai.) |
+| W17 | Croire que les taints bloquent un Pod avec `spec.nodeName` | `nodeName` posé à la main = **bypass total du scheduler** : aucun filtre, **taints compris** — le Pod atterrit même sur un node tainté `NoSchedule` sans toleration (c'est ça, « être soi-même le scheduler »). ⚠️ `nodeName` est **immuable** → pour l'ajouter : `kubectl replace --force -f`. |
 
 ---
 
@@ -125,6 +128,7 @@ _Dernière mise à jour : 2026-07-31_
 | N11 | Confondre `pathType` (Ingress) et `path.type` (HTTPRoute) | Valeurs **différentes**. Ingress = `Prefix`/`Exact`/`ImplementationSpecific` sous `pathType`. HTTPRoute (Gateway API) = `PathPrefix`/`Exact`/`RegularExpression` sous `matches[].path.type`. Écrire `Prefix` dans un HTTPRoute (ou `PathPrefix` dans un Ingress) = rejet/no-match. |
 | N12 | Ingress : confondre **404** et **503** | **404** = aucune règle ne matche (mauvais/absent `Host:` ou path) → requête au **default backend**, *pas* à l'app. **503** = la règle **matche** mais le **backend Service n'a aucun endpoint** (Service inexistant, Pods `NotReady`, selector KO). Donc 503 = « le routing est bon, le backend est cassé » → `kubectl get endpointslices -l kubernetes.io/service-name=<svc>`. Ne pas debugger le `Host:` sur un 503. |
 | N13 | `create service` : selector **générique** `app=<nom>` (≠ `expose`) | `kubectl create service clusterip web --tcp=80:8080` pose un selector **fixe** `app=web` (**non** dérivé d'un workload) → **aucun endpoint** si les Pods ne portent pas `app=web`. À l'inverse `kubectl expose deploy web --port=80 --target-port=8080` **dérive** le selector des labels réels de la cible → branché direct. `create service externalname` reste le seul moyen impératif pour un **ExternalName**. Vérifie : `kubectl get ep <svc>`. |
+| N14 | « Nom DNS stable d'un Pod » : répondre la forme `<ip-tirets>.<ns>.pod.cluster.local` | Cette forme **change à chaque redémarrage** (elle encode l'IP) — c'est le piège tendu. La bonne réponse : `hostname:` + `subdomain: <svc>` sur le Pod, avec un Service **headless** du même nom → `<hostname>.<svc>.<ns>.svc.cluster.local`, stable quel que soit l'IP. Attention : le `subdomain` doit pointer le **bon** Service headless s'il y en a plusieurs dans le ns. |
 
 > **NetworkPolicy — OR vs AND dans `from`/`to`** (piège N5) : `from` est une **liste** de sources. Un `-` par source ⇒ **OR** entre elles. Mettre `podSelector` **et** `namespaceSelector` **sous le même `-`** ⇒ **AND** (les deux à la fois).
 >
@@ -171,7 +175,7 @@ _Dernière mise à jour : 2026-07-31_
 | T3 | Oublier `--previous` sur un pod qui a redémarré | `kubectl logs <pod> --previous` pour voir le crash précédent. |
 | T4 | Node NotReady : ne pas SSH | `ssh <node>` → `systemctl status kubelet` + `journalctl -u kubelet -e`. Souvent kubelet down / swap on / containerd down. |
 | T5 | Oublier `sudo` avec `crictl`/systemctl | Accès root nécessaire sur le node. |
-| T6 | kubelet : ne pas connaître ses fichiers | Config : `/var/lib/kubelet/config.yaml` · service : `/etc/systemd/system/kubelet.service.d/` · après modif → `systemctl daemon-reload && systemctl restart kubelet`. |
+| T6 | kubelet : ne pas connaître ses fichiers | Config : `/var/lib/kubelet/config.yaml` · service : `/etc/systemd/system/kubelet.service.d/` · après modif → `systemctl daemon-reload && systemctl restart kubelet`. ⚠️ Un **drop-in** ultérieur peut **overrider `ExecStart`** → `systemctl cat kubelet` montre l'unit **et tous** les drop-ins ; `status=203/EXEC` au démarrage = chemin de binaire erroné (`which kubelet` donne le vrai). |
 | T7 | Réactivation du **swap** casse le kubelet | `swapoff -a` + commenter dans `/etc/fstab`. |
 | T8 | Chercher la cause dans le mauvais composant | Remonte la chaîne : Pod → node → kubelet → runtime (containerd). |
 | T9 | **Pods `Pending` sans event de ressources** = scheduler down | Personne ne remplit `spec.nodeName`. Vérifier `kubectl -n kube-system get pods -l component=kube-scheduler` (static pod → `/etc/kubernetes/manifests/kube-scheduler.yaml`). |
@@ -179,6 +183,7 @@ _Dernière mise à jour : 2026-07-31_
 | T11 | Croire qu'un composant "parle" à un autre | Aucun messaging direct : **seul l'apiserver touche etcd** ; tous les autres composants **watch** l'API. Un composant réagit à un **champ** (ex. `nodeName` vide), pas à un ordre. |
 | T12 | **Namespace bloqué en `Terminating`** | Une ressource dedans garde un **finalizer** non résolu. Diagnostic : `kubectl get ns <ns> -o yaml` (voir `spec.finalizers` + `status.conditions`) puis `kubectl api-resources --verbs=list --namespaced -o name \| xargs -n1 kubectl get -n <ns>` pour trouver l'objet coincé. Fix propre : vider le finalizer de **l'objet** → `kubectl patch <res> <name> -n <ns> --type=merge -p '{"metadata":{"finalizers":[]}}'`. Forcer le finalizer du **namespace** (`/finalize`) = dernier recours (laisse des ressources orphelines). |
 | T13 | Pod `1/1 Running` ≠ appli OK | Un container peut être **Running** alors que le process **ne fait rien** (mauvais paramètre avalé silencieusement) ou a paniqué au boot. Ne jamais se fier au STATUS seul → **`kubectl logs`** systématique. Ex. LFS258 : `panic: unable to parse quantity's suffix` sur `150mi` (bon = `150Mi`) → le Pod passe `Error`/CrashLoop. |
+| T14 | Confondre **liveness** et **readiness** | Readiness KO = Pod **Running mais 0/1**, retiré des **endpoints** de tous les Services — **jamais redémarré**. Liveness KO = le kubelet **tue et relance** le conteneur (`restartCount`++). Donc « pod présent mais pas de trafic » → readiness ; « restarts en boucle » → liveness. ⚠️ Une probe `exec` tourne **dans** le conteneur : la commande (`wget`, `curl`…) doit exister dans l'**image**. |
 
 ---
 

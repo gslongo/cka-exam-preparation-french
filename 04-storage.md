@@ -160,6 +160,7 @@ sequenceDiagram
 
 - **`volumeBindingMode: Immediate`** (défaut) : PV créé dès la création du PVC
 - **`WaitForFirstConsumer`** : PV créé quand le premier Pod consomme le PVC → permet au scheduler de choisir un node avant provisioning (essentiel pour zones cloud multi-AZ)
+- **Reconnaître un PV dynamique** : nom `pvc-<uid>` + annotation `pv.kubernetes.io/provisioned-by: <provisioner>` ; il **hérite** du `reclaimPolicy` de la StorageClass (`Retain` → le PV survit à la suppression du PVC, en état `Released`)
 
 ### Resize d'un PVC
 

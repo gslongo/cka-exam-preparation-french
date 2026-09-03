@@ -134,6 +134,8 @@ kubectl debug node/n1 -it --image=busybox
 ```bash
 # Kubelet
 systemctl status kubelet
+systemctl cat kubelet                      # unit + TOUS les drop-ins, en ordre de chargement
+ls /etc/systemd/system/kubelet.service.d/  # un drop-in ultérieur peut overrider ExecStart
 journalctl -u kubelet -f
 journalctl -u kubelet --since "10 min ago" | grep -i error
 cat /var/lib/kubelet/config.yaml
@@ -146,7 +148,11 @@ crictl logs <container-id>
 crictl inspect <container-id>
 crictl images
 crictl pull docker.io/nginx:1.25
+crictl rm -f <container-id>                    # kill un conteneur → le kubelet le relance (même Pod, restartCount+1)
 crictl rmi $(crictl images -q | tail -n +11)   # nettoyage
+
+# CNI — config lue par le kubelet (1er fichier en ordre lexical gagne)
+ls /etc/cni/net.d/                             # ex. 10-calico.conflist → plugin Calico
 
 # Static pods (control plane)
 ls /etc/kubernetes/manifests/
@@ -156,6 +162,8 @@ tail -f /var/log/containers/kube-apiserver-*.log
 kubeadm certs check-expiration
 openssl x509 -in /etc/kubernetes/pki/apiserver.crt -noout -dates
 ```
+
+> 💡 **kubelet `status=203/EXEC`** au démarrage = **chemin de binaire erroné** dans `ExecStart` (souvent un **drop-in** fautif). `systemctl cat kubelet` montre l'unit **et** tous les drop-ins ; `which kubelet` donne le vrai chemin. Après correction : `systemctl daemon-reload && systemctl restart kubelet`.
 
 ### Diagnostic réseau/DNS
 
@@ -324,6 +332,7 @@ spec:
 - Un `kind: Pod` seul **NE se répare PAS**. Si le Pod meurt ou son node tombe, personne ne le recrée.
 - Self-healing = propriété du **controller parent** (`Deployment`/`ReplicaSet`/`StatefulSet`/`DaemonSet`/`Job`).
 - `spec.restartPolicy` (`Always`/`OnFailure`/`Never`, **défaut `Always`**) contrôle uniquement le **redémarrage d'un container** par le kubelet, **au sein du Pod encore existant**. Ne recrée pas le Pod.
+- **Le vérifier en pratique** : `kubectl delete pod <p>` → le **controller parent** recrée un Pod *neuf* (autre nom) ; `sudo crictl rm -f <id>` → le **kubelet** relance le conteneur *dans le même Pod* (`restartCount` +1). Les events (`kubectl get events -A --sort-by=.metadata.creationTimestamp`) montrent qui a réparé quoi.
 - **Éviction** = K8s tue lui-même le Pod (≠ `kubectl delete`). 3 causes : **node pressure** (kubelet manque de RAM/disque/PID), **`kubectl drain`** (vidange d'un node pour maintenance), **taint `NoExecute`** (éjecte les Pods sans toleration). → avec controller : recréé ailleurs ; **bare Pod : perdu**.
 
 > 💡 Piège d'exam : "Créez un Pod avec `restartPolicy: Always` pour self-healing" = mauvais réflexe. **Toujours** un Deployment (ou équivalent) sauf demande explicite d'un bare Pod.
