@@ -85,6 +85,45 @@ _Dernière mise à jour : 2026-09-03_
 | S5 | CSR : oublier d'**approuver** | CSR = demande de certif **client** (ex. accès d'un user à l'API/kubectl via `signerName: kubernetes.io/kube-apiserver-client`, `usages: [client auth]`). `kubectl certificate approve <csr>` sinon **le CSR** reste `Pending` (`.status.certificate` vide) → cert jamais émis, kubeconfig inutilisable. ⚠️ Le cert **authentifie** (CN=user, O=groupe) mais n'**autorise** rien → il faut encore un RoleBinding/ClusterRoleBinding. |
 | S6 | RBAC sur des **Custom Resources** : mauvais `apiGroups` | Dans le Role : `apiGroups` = le **groupe du CR** (ex. `education.cka.local`, visible dans `apiVersion` du CR) et `resources` = le **pluriel du CRD** (`students`). Mettre `apiextensions.k8s.io` est un contresens : ce groupe-là gère les **CRD eux-mêmes** (les définir), pas leurs instances. Vérifie : `kubectl auth can-i list students.education.cka.local --as=system:serviceaccount:<ns>:<sa>`. |
 
+> **RBAC sur Custom Resources — exemple complet** (piège S6) : un CR `apiVersion: education.cka.local/v1, kind: Student` → dans le Role, `apiGroups` = ce qui est **avant** le `/v1`, `resources` = le pluriel déclaré par le CRD (`kubectl api-resources --api-group=education.cka.local` le donne).
+>
+> ```yaml
+> apiVersion: rbac.authorization.k8s.io/v1
+> kind: Role
+> metadata:
+>   name: operator-role
+>   namespace: q4-operator
+> rules:
+> - apiGroups: ["education.cka.local"]        # ✅ le GROUPE du CR (pas apiextensions.k8s.io)
+>   resources: ["students", "teachers"]        # ✅ PLURIELS du CRD (pas Student)
+>   verbs: ["get", "list", "watch"]
+> # ❌ Contresens classique — ceci donne le droit de gérer les DÉFINITIONS de CRD,
+> #    pas de lire les instances :
+> # - apiGroups: ["apiextensions.k8s.io"]
+> #   resources: ["customresourcedefinitions"]
+> ---
+> apiVersion: rbac.authorization.k8s.io/v1
+> kind: RoleBinding
+> metadata:
+>   name: operator-rb
+>   namespace: q4-operator
+> subjects:
+> - kind: ServiceAccount
+>   name: operator-sa
+>   namespace: q4-operator
+> roleRef:
+>   kind: Role
+>   name: operator-role
+>   apiGroup: rbac.authorization.k8s.io
+> ```
+>
+> Vérification immédiate (le `--as` avec le préfixe `system:serviceaccount:` complet) :
+>
+> ```bash
+> kubectl -n q4-operator auth can-i list students.education.cka.local \
+>   --as=system:serviceaccount:q4-operator:operator-sa        # yes attendu
+> ```
+
 ---
 
 ## 📦 Workloads & Scheduling (domaine 02 — 15 %)
